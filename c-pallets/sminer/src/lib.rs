@@ -12,12 +12,11 @@
 //!
 //! ### Dispatchable Functions
 //!
-//! * `register` - Staking and register for storage miner.
+//! * `regnstk` - Staking and register for storage miner.
 //! * `redeem` - Redeem and exit for storage miner.
 //! * `claim` - Claim the rewards from storage miner's earnings.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-
 
 use frame_support::traits::{Currency, OnUnbalanced, ReservableCurrency, ExistenceRequirement::AllowDeath};
 pub use pallet::*;
@@ -26,13 +25,9 @@ use sp_runtime::{
 	traits::{AccountIdConversion, StaticLookup, Zero},
 };
 use sp_std::prelude::*;
-
 use codec::{Encode, Decode};
-
 use frame_support::{dispatch::DispatchResult, transactional, PalletId};
-
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-
 
 /// The custom struct for storing info of storage miners.
 #[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
@@ -43,6 +38,14 @@ pub struct Mr<AccountId, Balance> {
 	collaterals: Balance,
 	earnings: Balance,
 	locked: Balance,
+}
+
+/// The custom struct for storing index of segment, miner's current power and space.
+#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
+pub struct SegmentInfo {
+	segment_index: u64,
+	power: u128,
+	space: u128,
 }
 
 #[frame_support::pallet]
@@ -59,10 +62,8 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// The overarching event type.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-
 		/// The currency trait.
 		type Currency: ReservableCurrency<Self::AccountId>;
-
 		/// The treasury's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -80,7 +81,7 @@ pub mod pallet {
 		Claimed(T::AccountId, BalanceOf<T>),
 	}
 
-	/// Error for the nicks pallet.
+	/// Error for the sminer pallet.
 	#[pallet::error]
 	pub enum Error<T> {
 		/// An account doesn't registered.
@@ -95,11 +96,6 @@ pub mod pallet {
 		Overflow,
 	}
 
-	/// The lookup table for names.
-	#[pallet::storage]
-	pub(super) type NameOf<T: Config> =
-		StorageMap<_, Twox64Concat, T::AccountId, (Vec<u8>, BalanceOf<T>)>;
-
 	/// The hashmap for info of storage miners.
 	#[pallet::storage]
 	#[pallet::getter(fn miner_items)]
@@ -111,14 +107,30 @@ pub mod pallet {
 	pub(super) type WalletMiners<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, i8>;
 
-	/// The hashmap for info of storage miners.
+	/// The hashmap for index of storage miners, it's unique to whole system.
 	#[pallet::storage]
 	#[pallet::getter(fn peer_index)]
 	pub(super) type PeerIndex<T: Config> = StorageValue<_, u64, ValueQuery>;
 
+	/// The total power of all storage miners.
+	#[pallet::storage]
+	#[pallet::getter(fn total_power)]
+	pub(super) type TotalPower<T: Config> = StorageValue<_, u128, ValueQuery>;
+
+	/// The total storage space to fill of all storage miners.
+	#[pallet::storage]
+	#[pallet::getter(fn total_space)]
+	pub(super) type TotalSpace<T: Config> = StorageValue<_, u128, ValueQuery>;
+
+	/// The hashmap for segment info including index of segment, miner's current power and space.
+	#[pallet::storage]
+	#[pallet::getter(fn seg_info)]
+	pub(super) type SegInfo<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, SegmentInfo, ValueQuery>;
+
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
+
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -127,24 +139,18 @@ pub mod pallet {
 		/// The dispatch origin of this call must be _Signed_.
 		///
 		/// Parameters:
+		/// - `beneficiary`: The beneficiary related to signer account.
 		/// - `ip`: The registered IP of storage miner.
 		/// - `staking_val`: The number of staking.
 		#[pallet::weight(50_000_000)]
-		pub fn register(origin: OriginFor<T>, beneficiary: <T::Lookup as StaticLookup>::Source, ip: u32, #[pallet::compact] staking_val: BalanceOf<T>) -> DispatchResult {
+		pub fn regnstk(origin: OriginFor<T>, beneficiary: <T::Lookup as StaticLookup>::Source, ip: u32, #[pallet::compact] staking_val: BalanceOf<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
-
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
-
 			ensure!(!(<WalletMiners<T>>::contains_key(&sender)), Error::<T>::AlreadyRegistered);
-
 			T::Currency::reserve(&sender, staking_val.clone())?;
-
 			let value = BalanceOf::<T>::from(0 as u32);
-
 			let cur_idx = PeerIndex::<T>::get();
-
 			let peerid = cur_idx.checked_add(1).ok_or(Error::<T>::Overflow)?;
-
 			<MinerItems<T>>::insert(
 				&sender,
 				Mr::<T::AccountId, BalanceOf<T>> {
@@ -156,59 +162,35 @@ pub mod pallet {
 					locked: value.clone(),
 				}
 			);
-
 			<WalletMiners<T>>::insert(&sender, 1);
-
 			<PeerIndex<T>>::put(peerid);
-
 			Self::deposit_event(Event::<T>::Registered(sender.clone(), staking_val.clone()));
-
 			Ok(())
 		}
 
-		/// Redeem and exit for storage miner.
-		///
-		/// The dispatch origin of this call must be _Signed_.
+		
 		#[pallet::weight(50_000_000)]
 		pub fn redeem(origin: OriginFor<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
-
 			ensure!(<WalletMiners<T>>::contains_key(&sender), Error::<T>::UnregisteredAccountId);
-
 			ensure!(MinerItems::<T>::get(&sender).locked == BalanceOf::<T>::from(0 as u32), Error::<T>::LockedNotEmpty);
-
 			let deposit = MinerItems::<T>::get(&sender).collaterals;
-
 			let _ = T::Currency::unreserve(&sender, deposit.clone());
-
 			<WalletMiners<T>>::remove(&sender);
-
 			<MinerItems<T>>::remove(&sender);
-
 			Self::deposit_event(Event::<T>::Redeemed(sender.clone(), deposit.clone()));
-
 			Ok(())
 		}
 
-		/// Claim the rewards from storage miner's earnings.
-		///
-		/// The dispatch origin of this call must be _Signed_.
 		#[pallet::weight(50_000_000)]
 		pub fn claim(origin: OriginFor<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
-
 			ensure!(<WalletMiners<T>>::contains_key(&sender), Error::<T>::UnregisteredAccountId);
-
 			ensure!(MinerItems::<T>::get(&sender).earnings != BalanceOf::<T>::from(0 as u32), Error::<T>::EarningsIsEmpty);
-
 			let deposit = MinerItems::<T>::get(&sender).earnings;
-
 			let reward_pot = T::PalletId::get().into_account();
-
 			let _ = T::Currency::transfer(&reward_pot, &sender, deposit.clone(), AllowDeath);
-
 			Self::deposit_event(Event::<T>::Claimed(sender.clone(), deposit.clone()));
-
 			Ok(())
 		}
 	}

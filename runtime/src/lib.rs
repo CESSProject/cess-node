@@ -276,6 +276,23 @@ impl pallet_sminer::Config for Runtime {
 	type PalletId = RewardPalletId;
 }
 
+parameter_types! {
+	pub const RePalletId: PalletId = PalletId(*b"rewardpt");
+}
+
+impl pallet_segment_book::Config for Runtime {
+	type Currency = Balances;
+	// The ubiquitous event type.
+	type Event = Event;
+	type PalletId = RePalletId;
+}
+
+impl pallet_file_bank::Config for Runtime {
+	type Currency = Balances;
+	// The ubiquitous event type.
+	type Event = Event;
+}
+
 // /// Configure the pallet-template in pallets/template.
 // impl pallet_template::Config for Runtime {
 // 	type Event = Event;
@@ -297,8 +314,8 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Sminer: pallet_sminer::{Pallet, Call, Storage, Event<T>},
-		// Include the custom logic from the pallet-template in the runtime.
-		//TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
+		SegmentBook: pallet_segment_book::{Pallet, Call, Storage, Event<T>},
+		FileBank: pallet_file_bank::{Pallet,Call, Storage, Event<T>},
 	}
 );
 
