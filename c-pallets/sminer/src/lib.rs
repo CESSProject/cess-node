@@ -105,7 +105,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn wallet_miners)]
 	pub(super) type WalletMiners<T: Config> =
-		StorageMap<_, Twox64Concat, T::AccountId, i8>;
+		StorageMap<_, Twox64Concat, T::AccountId, i8, ValueQuery>;
 
 	/// The hashmap for index of storage miners, it's unique to whole system.
 	#[pallet::storage]
@@ -125,7 +125,7 @@ pub mod pallet {
 	/// The hashmap for segment info including index of segment, miner's current power and space.
 	#[pallet::storage]
 	#[pallet::getter(fn seg_info)]
-	pub(super) type SegInfo<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, SegmentInfo, ValueQuery>;
+	pub(super) type SegInfo<T: Config> = StorageMap<_, Twox64Concat, u64, SegmentInfo, ValueQuery>;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -164,20 +164,31 @@ pub mod pallet {
 			);
 			<WalletMiners<T>>::insert(&sender, 1);
 			<PeerIndex<T>>::put(peerid);
+
+			<SegInfo<T>>::insert(
+				peerid,
+				SegmentInfo {
+					segment_index: 0 as u64,
+					power: 0 as u128,
+					space: 0 as u128,
+				}
+			);
+
 			Self::deposit_event(Event::<T>::Registered(sender.clone(), staking_val.clone()));
 			Ok(())
 		}
-
 		
 		#[pallet::weight(50_000_000)]
 		pub fn redeem(origin: OriginFor<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			ensure!(<WalletMiners<T>>::contains_key(&sender), Error::<T>::UnregisteredAccountId);
-			ensure!(MinerItems::<T>::get(&sender).locked == BalanceOf::<T>::from(0 as u32), Error::<T>::LockedNotEmpty);
-			let deposit = MinerItems::<T>::get(&sender).collaterals;
+			let mi = MinerItems::<T>::get(&sender);
+			ensure!(mi.locked == BalanceOf::<T>::from(0 as u32), Error::<T>::LockedNotEmpty);
+			let deposit = mi.collaterals;
 			let _ = T::Currency::unreserve(&sender, deposit.clone());
 			<WalletMiners<T>>::remove(&sender);
 			<MinerItems<T>>::remove(&sender);
+			<SegInfo<T>>::remove(mi.peerid);
 			Self::deposit_event(Event::<T>::Redeemed(sender.clone(), deposit.clone()));
 			Ok(())
 		}
@@ -194,4 +205,28 @@ pub mod pallet {
 			Ok(())
 		}
 	}
+}
+
+impl<T: Config> Pallet<T> {
+
+	pub fn get_ids(aid: T::AccountId) -> (u64, u64) {
+		//check exist
+		if !<WalletMiners<T>>::contains_key(&aid) {
+			Error::<T>::UnregisteredAccountId;
+		}
+		let peerid = MinerItems::<T>::get(&aid).peerid;
+		SegInfo::<T>::mutate(peerid, |s| (*s).segment_index += 1);
+		let segment_new_index = SegInfo::<T>::get(peerid).segment_index;
+		(peerid, segment_new_index)
+	}
+
+	pub fn add_power(peerid: u64, increment: u128) {
+		//check exist
+		if !<SegInfo<T>>::contains_key(peerid) {
+			Error::<T>::UnregisteredAccountId;
+		}
+		SegInfo::<T>::mutate(peerid, |s| (*s).power += increment);
+		TotalPower::<T>::mutate(|s| *s += increment);
+	}
+
 }

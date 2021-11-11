@@ -266,32 +266,39 @@ impl pallet_sudo::Config for Runtime {
 
 /*** Add This Block ***/
 parameter_types! {
-	pub const RewardPalletId: PalletId = PalletId(*b"rewardpt");
+	pub const SminerPalletId: PalletId = PalletId(*b"rewardpt");
 }
 
 impl pallet_sminer::Config for Runtime {
 	type Currency = Balances;
 	// The ubiquitous event type.
 	type Event = Event;
-	type PalletId = RewardPalletId;
+	type PalletId = SminerPalletId;
 }
 
 parameter_types! {
-	pub const RePalletId: PalletId = PalletId(*b"rewardpt");
+	pub const SegbkPalletId: PalletId = PalletId(*b"rewardpt");
 }
 
 impl pallet_segment_book::Config for Runtime {
 	type Currency = Balances;
 	// The ubiquitous event type.
 	type Event = Event;
-	type PalletId = RePalletId;
+	type MyPalletId = SegbkPalletId;
+	type MyRandomness = RandomnessCollectiveFlip;
+}
+
+parameter_types! {
+	pub const FilbakPalletId: PalletId = PalletId(*b"rewardpt");
 }
 
 impl pallet_file_bank::Config for Runtime {
 	type Currency = Balances;
 	// The ubiquitous event type.
 	type Event = Event;
+	type FilbakPalletId = FilbakPalletId;
 }
+/*** End This Block ***/
 
 // /// Configure the pallet-template in pallets/template.
 // impl pallet_template::Config for Runtime {
