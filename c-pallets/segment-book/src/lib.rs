@@ -47,6 +47,14 @@ pub struct ProofInfoPPA<BlockNumber> {
 	block_num: Option<BlockNumber>,
 }
 
+
+#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
+pub struct ParamInfo {
+	peer_id: u64,
+	segment_id: u64,
+	rand: u32,
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -99,7 +107,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		//peer id
-		u64,
+		T::AccountId,
 		Twox64Concat,
 		//segment id
 		u64,
@@ -113,13 +121,17 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		//peer id
-		u64,
+		T::AccountId,
 		Twox64Concat,
 		//segment id
 		u64,
 		ProofInfoPPA<T::BlockNumber>,
 		ValueQuery,
 	>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn param_set)]
+	pub(super) type ParamSet<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo, ValueQuery>;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -133,9 +145,9 @@ pub mod pallet {
 			//-------------------here needs a check func.
 			//call to generate random number
 			let random = Self::generate_random_number(20211109);
-			let (peer_id, segment_id) = pallet_sminer::Pallet::<T>::get_ids(sender);
+			let (peer_id, segment_id) = pallet_sminer::Pallet::<T>::get_ids(&sender);
 			<VerPoolA<T>>::insert(
-				peer_id,
+				&sender,
 				segment_id,
 				ProofInfoVPA {
 					is_ready: false,
@@ -146,6 +158,16 @@ pub mod pallet {
 					block_num: None,
 				}
 			);
+
+			<ParamSet<T>>::insert(
+				&sender,
+				ParamInfo {
+					peer_id,
+					segment_id,
+					rand: random,
+				}
+			);
+
 			Self::deposit_event(Event::<T>::ParamSet(peer_id, segment_id, random));
 			Ok(())
 		}
@@ -154,9 +176,9 @@ pub mod pallet {
 		pub fn submit_to_vpa(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
-			ensure!(<VerPoolA<T>>::contains_key(peer_id, segment_id), Error::<T>::NoIntentSubmitYet);
+			ensure!(<VerPoolA<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
 			
-			VerPoolA::<T>::mutate(peer_id, segment_id, |s| {
+			VerPoolA::<T>::mutate(&sender, segment_id, |s| {
 				(*s).is_ready = true;
 				(*s).proof = Some(proof);
 				(*s).block_num = Some(<frame_system::Pallet<T>>::block_number());
@@ -171,15 +193,15 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 
-			ensure!(<VerPoolA<T>>::contains_key(peer_id, segment_id), Error::<T>::NotExistInVPA);
+			ensure!(<VerPoolA<T>>::contains_key(&sender, segment_id), Error::<T>::NotExistInVPA);
 
-			let vpa = VerPoolA::<T>::get(peer_id, segment_id);
+			let vpa = VerPoolA::<T>::get(&sender, segment_id);
 
 			ensure!(vpa.is_ready, Error::<T>::NotReadyInVPA);
 			
 			if result {
 				<PrePoolA<T>>::insert(
-					peer_id,
+					&sender,
 					segment_id,
 					ProofInfoPPA {
 						//false for 8M segment, true for 512M segment
@@ -193,9 +215,9 @@ pub mod pallet {
 				} else {
 					8u128
 				};
-				pallet_sminer::Pallet::<T>::add_power(peer_id, increment);
+				pallet_sminer::Pallet::<T>::add_power(&sender, increment);
 			}
-			<VerPoolA<T>>::remove(peer_id, segment_id);
+			<VerPoolA<T>>::remove(&sender, segment_id);
 
 			Self::deposit_event(Event::<T>::VPAVerified(peer_id, segment_id));
 			Ok(())
