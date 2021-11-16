@@ -742,6 +742,7 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
+ "pallet-file-bank",
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
  "pallet-segment-book",
@@ -3788,6 +3789,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-file-bank"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-grandpa"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?tag=monthly-2021-09+1#20a9bbb1fe47fcd62fcd64b2fa32456b4f434aaf"
@@ -3829,6 +3846,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "pallet-balances",
+ "pallet-sminer",
  "parity-scale-codec",
  "serde",
  "sp-core",
