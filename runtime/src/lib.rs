@@ -297,6 +297,7 @@ impl pallet_file_bank::Config for Runtime {
 	// The ubiquitous event type.
 	type Event = Event;
 	type FilbakPalletId = FilbakPalletId;
+	type WeightInfo = pallet_file_bank::weights::SubstrateWeight<Runtime>;
 }
 /*** End This Block ***/
 
