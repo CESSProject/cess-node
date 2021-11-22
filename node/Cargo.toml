@@ -22,6 +22,7 @@ version = '3.0.0'
 [dependencies]
 jsonrpc-core = '18.0.0'
 structopt = '0.3.8'
+rand = "0.7.2"
 
 [dependencies.cess-node-runtime]
 path = '../runtime'
@@ -63,7 +64,7 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '0.10.0-dev'
 
-[dependencies.sc-consensus-aura]
+[dependencies.sc-consensus-babe]
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '0.10.0-dev'
@@ -135,7 +136,7 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '0.10.0-dev'
 
-[dependencies.sp-consensus-aura]
+[dependencies.sp-consensus-babe]
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '0.10.0-dev'
@@ -164,6 +165,58 @@ version = '4.0.0-dev'
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '4.0.0-dev'
+
+[dependencies.pallet-im-online]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-authority-discovery]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-transaction-storage-proof]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-authorship]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sc-consensus-uncles]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '0.10.0-dev'
+
+[dependencies.sc-finality-grandpa-rpc]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '0.10.0-dev'
+
+[dependencies.sc-consensus-babe-rpc]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '0.10.0-dev'
+
+[dependencies.sp-keystore]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '0.10.0-dev'
+
+[dependencies.sc-consensus-epochs]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '0.10.0-dev'
+
+[dependencies.sc-chain-spec]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+
 
 [features]
 default = []

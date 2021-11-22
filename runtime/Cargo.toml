@@ -16,9 +16,9 @@ version = '5.0.0-dev'
 
 [dependencies.codec]
 default-features = false
-features = ['derive']
+features = ['derive', 'max-encoded-len',]
 package = 'parity-scale-codec'
-version = '2.0.0'
+version = '2.2.0'
 
 [dependencies.frame-benchmarking]
 default-features = false
@@ -62,7 +62,7 @@ version = '4.0.0-dev'
 optional = true
 version = '0.3.1'
 
-[dependencies.pallet-aura]
+[dependencies.pallet-babe]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
@@ -122,7 +122,7 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '4.0.0-dev'
 
-[dependencies.sp-consensus-aura]
+[dependencies.sp-consensus-babe]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
@@ -176,6 +176,109 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-09+1'
 version = '4.0.0-dev'
 
+[dependencies.pallet-im-online]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-session]
+default-features = false
+features = ['historical',]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-authorship]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-authority-discovery]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-authority-discovery]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-offences]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-staking]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.frame-election-provider-support]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-npos-elections]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-election-provider-multi-phase]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-membership]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-collective]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-treasury]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-bounties]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-staking-reward-curve]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.sp-staking]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-scheduler]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-09+1'
+version = '4.0.0-dev'
+
 # local dependencies
 [dependencies.pallet-sminer]
 default-features = false
@@ -212,7 +315,7 @@ std = [
     'frame-support/std',
     'frame-system-rpc-runtime-api/std',
     'frame-system/std',
-    'pallet-aura/std',
+    'pallet-babe/std',
     'pallet-balances/std',
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
@@ -223,7 +326,7 @@ std = [
     'pallet-sminer/std',
     'sp-api/std',
     'sp-block-builder/std',
-    'sp-consensus-aura/std',
+    'sp-consensus-babe/std',
     'sp-core/std',
     'sp-inherents/std',
     'sp-offchain/std',
@@ -232,4 +335,19 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    "pallet-im-online/std",
+    "sp-authority-discovery/std",
+    "pallet-authority-discovery/std",
+    "pallet-authorship/std",
+    "pallet-session/std",
+    "pallet-offences/std",
+    "sp-npos-elections/std",
+    "pallet-staking/std",
+    "pallet-election-provider-multi-phase/std",
+    "pallet-membership/std",
+    "pallet-collective/std",
+    "pallet-treasury/std",
+    "pallet-bounties/std",
+    "sp-staking/std",
+    "pallet-scheduler/std",
 ]
