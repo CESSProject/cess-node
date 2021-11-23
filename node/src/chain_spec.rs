@@ -101,12 +101,7 @@ pub fn development_config() -> ChainSpec {
 				// Initial PoA authorities
 				vec![authority_keys_from_seed("Alice")],
 				// Pre-funded accounts
-				vec![
-					get_account_id_from_seed::<sr25519::Public>("Alice"),
-					get_account_id_from_seed::<sr25519::Public>("Bob"),
-					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-				],
+				vec![],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				None
@@ -121,7 +116,7 @@ pub fn development_config() -> ChainSpec {
 		// Properties
 		None,
 		// Extensions
-		None,
+		Default::default(),
 	)
 }
 
