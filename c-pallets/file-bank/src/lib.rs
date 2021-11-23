@@ -104,6 +104,10 @@ pub mod pallet {
 	#[pallet::getter(fn invoice)]
 	pub(super) type Invoice<T: Config> = StorageMap<_, Twox64Concat, Vec<u8>, u8, ValueQuery>;
 
+	/// The hashmap for segment info including index of segment, miner's current power and space.
+	#[pallet::storage]
+	#[pallet::getter(fn seg_info)]
+	pub(super) type UserFileSize<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, u128, ValueQuery>;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -119,8 +123,8 @@ pub mod pallet {
 			let blocknumber = deadline / (6 as u128);
 			let now = <frame_system::Pallet<T>>::block_number();
 
-			let acc = T::FilbakPalletId::get().into_account();
-			T::Currency::transfer(&sender, &acc, uploadfee, AllowDeath)?;
+			//let acc = T::FilbakPalletId::get().into_account();
+			//T::Currency::transfer(&sender, &acc, uploadfee, AllowDeath)?;
 			let mut invoice: Vec<u8> = Vec::new();
 			for i in &fileid {
 				invoice.push(*i);
@@ -150,6 +154,7 @@ pub mod pallet {
 					deadline: now + (blocknumber as u32).into(),
 				}
 			);
+			UserFileSize::<T>::mutate(sender.clone(), |s| *s += filesize);
 			Self::deposit_event(Event::<T>::FileUpload(sender.clone()));
 			Ok(())
 		}
