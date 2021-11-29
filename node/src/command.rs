@@ -51,9 +51,9 @@ impl SubstrateCli for Cli {
 
 	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		Ok(match id {
-			"" | "cess-hacknet" => Box::new(chain_spec::cess_hacknet_config()?),
-			"dev" => Box::new(chain_spec::development_config()?),
-			"local" => Box::new(chain_spec::local_testnet_config()?),
+			"" | "cess-hacknet" => Box::new(chain_spec::cess_hacknet_config()),
+			"dev" => Box::new(chain_spec::development_config()),
+			"local" => Box::new(chain_spec::local_testnet_config()),
 			path =>
 				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
 		})
@@ -131,7 +131,7 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.run_node_until_exit(|config| async move {
 				match config.role {
 					Role::Light => service::new_light(config),
-					_ => service::new_full(config),
+					_ => service::new_full(config, |_, _| ()),
 				}
 				.map_err(sc_cli::Error::Service)
 			})

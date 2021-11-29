@@ -11,13 +11,13 @@
 //!
 
 #![cfg_attr(not(feature = "std"), no_std)]
-use sp_std::prelude::*;
+
 pub use pallet::*;
 use sp_runtime::{
 	RuntimeDebug,
 	traits::{AccountIdConversion, StaticLookup, Zero, SaturatedConversion},
 };
-use sp_std::convert::TryInto;
+use sp_std::prelude::*;
 use codec::{Encode, Decode};
 use frame_support::{
 	dispatch::DispatchResult,
@@ -25,40 +25,46 @@ use frame_support::{
 	PalletId,
 	traits::{Currency, OnUnbalanced, ReservableCurrency, Get, Randomness, ExistenceRequirement::AllowDeath},
 };
-type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+use scale_info::TypeInfo;
+
+type AccountOf<T> = <T as frame_system::Config>::AccountId;
+type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
 
 /// The custom struct for storing info of proofs in VPA.
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoVPA<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoVPA<T: pallet::Config> {
 	is_ready: bool,
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
 	proof: Option<Vec<u8>>,
 	sealed_cid: Option<Vec<u8>>,
 	rand: u32,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
 /// The custom struct for storing info of proofs in PPA.
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoPPA<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoPPA<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
 	proof: Option<Vec<u8>>,
 	sealed_cid: Option<Vec<u8>>,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 pub struct ParamInfo {
 	peer_id: u64,
 	segment_id: u64,
 	rand: u32,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoVPB<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoVPB<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	is_ready: bool,
 	//false for 8M segment, true for 512M segment
@@ -66,72 +72,77 @@ pub struct ProofInfoVPB<BlockNumber> {
 	proof: Option<Vec<u8>>,
 	sealed_cid: Option<Vec<u8>>,
 	rand: u32,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoPPB<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoPPB<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
 	proof: Option<Vec<u8>>,
 	sealed_cid: Option<Vec<u8>>,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoVPC<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoVPC<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	is_ready: bool,
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
-	proof: Option<Vec<u8>>,
-	sealed_cid: Option<Vec<u8>>,
+	proof: Option<Vec<Vec<u8>>>,
+	sealed_cid: Option<Vec<Vec<u8>>>,
 	rand: u32,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoPPC<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoPPC<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
-	proof: Option<Vec<u8>>,
-	sealed_cid: Option<Vec<u8>>,
-	block_num: Option<BlockNumber>,
+	proof: Option<Vec<Vec<u8>>>,
+	sealed_cid: Option<Vec<Vec<u8>>>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoVPD<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoVPD<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	is_ready: bool,
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
-	proof: Option<Vec<u8>>,
-	sealed_cid: Option<Vec<u8>>,
+	proof: Option<Vec<Vec<u8>>>,
+	sealed_cid: Option<Vec<Vec<u8>>>,
 	rand: u32,
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct ProofInfoPPD<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ProofInfoPPD<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
 	size_type: u128,
-	proof: Option<Vec<u8>>,
-	sealed_cid: Option<Vec<u8>>,
-	block_num: Option<BlockNumber>,
+	proof: Option<Vec<Vec<u8>>>,
+	sealed_cid: Option<Vec<Vec<u8>>>,
+	block_num: Option<BlockNumberOf<T>>,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct PeerFileNum<BlockNumber> {
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct PeerFileNum<T: pallet::Config> {
 	//false for 8M segment, true for 512M segment
-	block_num: Option<BlockNumber>,
+	block_num: Option<BlockNumberOf<T>>,
 	total_num: u64,
 }
- 
-//Vec<(T::Account, peer_id, segment_id, poof, sealed_cid, rand, size_type)>
-//Unverified
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
-pub struct UnverifiedPool<AccountId> {
-	acc: AccountId,
+
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct UnverifiedPool<T: pallet::Config> {
+	acc: AccountOf<T>,
 	peer_id: u64,
 	segment_id: u64,
 	proof: Vec<u8>,
@@ -140,12 +151,59 @@ pub struct UnverifiedPool<AccountId> {
 	size_type: u128,
 }
 
-#[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug)]
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct UnverifiedPoolVec<T: pallet::Config> {
+	acc: AccountOf<T>,
+	peer_id: u64,
+	segment_id: u64,
+	proof: Vec<Vec<u8>>,
+	sealed_cid: Vec<Vec<u8>>,
+	uncid: Vec<Vec<u8>>,
+	rand: u32,
+	size_type: u128,
+}
+
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct UnverifiedPoolVecD<T: pallet::Config> {
+	acc: AccountOf<T>,
+	peer_id: u64,
+	segment_id: u64,
+	proof: Vec<Vec<u8>>,
+	sealed_cid: Vec<Vec<u8>>,
+	rand: u32,
+	size_type: u128,
+}
+
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
 pub struct ContinuousProofPool {
 	peer_id: u64,
 	segment_id: u64,
 	sealed_cid: Vec<u8>,
 	size_type: u128,
+}
+
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct ContinuousProofPoolVec {
+	peer_id: u64,
+	segment_id: u64,
+	sealed_cid: Vec<Vec<u8>>,
+	hash: Vec<u8>,
+	size_type: u128,
+}
+
+#[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct FileSilceInfo {
+	peer_id: u64,
+	segment_id: u64,
+	uncid: Vec<Vec<u8>>,
+	rand: u32,
+	hash: Vec<u8>,
+	shardhash: Vec<u8>,
 }
 
 #[frame_support::pallet]
@@ -173,7 +231,6 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	#[pallet::metadata(T::AccountId = "AccountId", BalanceOf<T> = "Balance")]
 	pub enum Event<T: Config> {
 		/// A series of params was generated.
 		ParamSet(u64, u64, u32),
@@ -194,24 +251,25 @@ pub mod pallet {
 
 		VPDVerified(u64, u64),
 
-		PPBNoOnTimeSubmit(T::AccountId, u64),
+		PPBNoOnTimeSubmit(AccountOf<T>, u64),
 
 		TestEventForHook(u64),
 	}
 
+	/// Error for the nicks pallet.
 	#[pallet::error]
 	pub enum Error<T> {
 		//submit without intent-submit call
 		NoIntentSubmitYet,
 		//the one to verify was not exist in VPA
 		NotExistInVPA,
-		//the one to verify was not ready in VPA
+		
 		NotExistInVPB,
 
 		NotExistInVPC,
 
 		NotExistInVPD,
-
+		//the one to verify was not ready in VPA
 		NotReadyInVPA,
 
 		NotReadyInVPB,
@@ -225,23 +283,25 @@ pub mod pallet {
 		SizeTypeError,
 
 		YetIntennt,
+
+		LastSubmitUnVerfy,
 	}
+
 	#[pallet::storage]
 	#[pallet::getter(fn param_set_a)]
-	pub(super) type ParamSetA<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo, ValueQuery>;
+	pub(super) type ParamSetA<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn param_set_b)]
-	pub(super) type ParamSetB<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo, ValueQuery>;
+	pub(super) type ParamSetB<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn param_set_c)]
-	pub(super) type ParamSetC<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo, ValueQuery>;
+	pub(super) type ParamSetC<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn param_set_d)]
-	pub(super) type ParamSetD<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo, ValueQuery>;
-
+	pub(super) type ParamSetD<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, ParamInfo>;
 
 	//It is used for miners to query themselves. It needs to provide spatiotemporal proof for those data segments
 	#[pallet::storage]
@@ -264,7 +324,7 @@ pub mod pallet {
 		//peer id
 		T::AccountId,
 		//segment id
-		Vec<ContinuousProofPool>,
+		Vec<ContinuousProofPoolVec>,
 		ValueQuery,
 	>;
 
@@ -277,8 +337,7 @@ pub mod pallet {
 		//peer id
 		T::AccountId,
 		//segment id
-		PeerFileNum<T::BlockNumber>,
-		ValueQuery,
+		PeerFileNum<T>,
 	>;
 
 	#[pallet::storage]
@@ -289,8 +348,7 @@ pub mod pallet {
 		//peer id
 		T::AccountId,
 		//segment id
-		PeerFileNum<T::BlockNumber>,
-		ValueQuery,
+		PeerFileNum<T>,
 	>;
 	//One Accout total blocknumber use For polling
 
@@ -304,8 +362,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoVPA<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoVPA<T>,
 	>;
 
 	#[pallet::storage]
@@ -318,13 +375,9 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoPPA<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoPPA<T>,
 	>;
 
-
-
-	
 	#[pallet::storage]
 	#[pallet::getter(fn vre_pool_b)]
 	pub(super) type VerPoolB<T: Config> = StorageDoubleMap<
@@ -335,8 +388,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoVPB<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoVPB<T>,
 	>;
 
 	#[pallet::storage]
@@ -349,8 +401,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoPPB<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoPPB<T>,
 	>;
 
 	#[pallet::storage]
@@ -363,8 +414,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoVPC<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoVPC<T>,
 	>;
 
 	#[pallet::storage]
@@ -377,8 +427,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoPPC<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoPPC<T>,
 	>;
 
 	#[pallet::storage]
@@ -391,8 +440,7 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoVPD<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoVPD<T>,
 	>;
 
 	#[pallet::storage]
@@ -405,63 +453,74 @@ pub mod pallet {
 		Twox64Concat,
 		//segment id
 		u64,
-		ProofInfoPPD<T::BlockNumber>,
-		ValueQuery,
+		ProofInfoPPD<T>,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn miner_hold_slice)]
+	pub(super) type MinerHoldSlice<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		//peer id
+		T::AccountId,
+		//segment id
+		Vec<FileSilceInfo>,
+
+		ValueQuery
+	>;
+	
 	//Unverified pool ABCD
 	//Vec<(T::Account, peer_id, segment_id, poof, sealed_cid, rand, size_type)>
 	#[pallet::storage]
 	#[pallet::getter(fn un_verified_a)]
-	pub(super) type UnVerifiedA<T: Config> = StorageValue<_, Vec<UnverifiedPool<T::AccountId>>, ValueQuery>;
+	pub(super) type UnVerifiedA<T: Config> = StorageValue<_, Vec<UnverifiedPool<T>>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn un_verified_b)]
-	pub(super) type UnVerifiedB<T: Config> = StorageValue<_, Vec<UnverifiedPool<T::AccountId>>, ValueQuery>;
+	pub(super) type UnVerifiedB<T: Config> = StorageValue<_, Vec<UnverifiedPool<T>>, ValueQuery>;
 
 
 	#[pallet::storage]
 	#[pallet::getter(fn un_verified_c)]
-	pub(super) type UnVerifiedC<T: Config> = StorageValue<_, Vec<UnverifiedPool<T::AccountId>>, ValueQuery>;
+	pub(super) type UnVerifiedC<T: Config> = StorageValue<_, Vec<UnverifiedPoolVec<T>>, ValueQuery>;
 
 
 	#[pallet::storage]
 	#[pallet::getter(fn un_verified_d)]
-	pub(super) type UnVerifiedD<T: Config> = StorageValue<_, Vec<UnverifiedPool<T::AccountId>>, ValueQuery>;
-
-
+	pub(super) type UnVerifiedD<T: Config> = StorageValue<_, Vec<UnverifiedPoolVecD<T>>, ValueQuery>;
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(now: T::BlockNumber) -> Weight {
+	impl<T: Config> Hooks<BlockNumberOf<T>> for Pallet<T> {
+		fn on_initialize(now: BlockNumberOf<T>) -> Weight {
 			let number: u128 = now.saturated_into();
 			
-			
-			if number % 10 == 0 {
+			if number % 4320 == 0 {
 				//Poll Idle Time and Space Proof
 				Self::deposit_event(Event::<T>::TestEventForHook(1));
 				for (acc, order_vec) in <BlockNumberB<T>>::iter() {
 					let blocknum: u128 = order_vec.block_num.unwrap().saturated_into();
-					if (number - 50) * (order_vec.total_num as u128) > blocknum{
+					if (number - 4320) * (order_vec.total_num as u128) > blocknum{
 						let sender = acc.clone();
+						let (peerid, _) = pallet_sminer::Pallet::<T>::get_ids(&sender);
 						for (key2, res) in <PrePoolB<T>>::iter_prefix(acc) {
 							let blocknum2: u128 = res.block_num.unwrap().saturated_into();
-							if number - 50 > blocknum2 {
-								pallet_sminer::Pallet::<T>::sub_power(&sender, res.size_type);
-								let rmt = <PrePoolB<T>>::get(&sender, key2);
-								<BlockNumberB<T>>::mutate(&sender, |s| {
-										(*s).block_num = Some((*s).block_num.unwrap() - rmt.block_num.unwrap());
-										(*s).total_num = (*s).total_num - 1;
-									}
+							if number - 4320 > blocknum2 {
+								pallet_sminer::Pallet::<T>::sub_power(peerid, res.size_type);
+								let rmt = <PrePoolB<T>>::get(&sender, key2).unwrap();
+								<BlockNumberB<T>>::mutate(&sender, |s_opt| {
+										let s = s_opt.as_mut().unwrap();
+										s.block_num = Some(s.block_num.unwrap() - rmt.block_num.unwrap());
+										s.total_num = s.total_num - 1;
+								}
 								);
 								<ConProofInfoA<T>>::mutate(&sender, |s|{
-									for i in 0..(*s).len() {
-										let v = (*s).get(i);
+									for i in 0..s.len() {
+										let v = s.get(i);
 										if v.unwrap().segment_id == key2 {
-											(*s).remove(i);
+											s.remove(i);
 											break;
 										}
 									}
@@ -476,23 +535,26 @@ pub mod pallet {
 				//Polling for proof of service time and space
 				for (acc, order_vec) in <BlockNumberD<T>>::iter() {
 					let blocknum: u128 = order_vec.block_num.unwrap().saturated_into();
-					if (number - 50) * (order_vec.total_num as u128) > blocknum{
+					if (number - 4320) * (order_vec.total_num as u128) > blocknum{
 						let sender = acc.clone();
 						for (key2, res) in <PrePoolD<T>>::iter_prefix(acc) {
 							let blocknum2: u128 = res.block_num.unwrap().saturated_into();
-							if number - 50 > blocknum2 {
-								pallet_sminer::Pallet::<T>::sub_power(&sender, res.size_type );
-								let rmt = <PrePoolD<T>>::get(&sender, key2);
-								<BlockNumberD<T>>::mutate(&sender, |s| {
-										(*s).block_num = Some((*s).block_num.unwrap() - rmt.block_num.unwrap());
-										(*s).total_num = (*s).total_num - 1;
-									}
+							let (peerid, _) = pallet_sminer::Pallet::<T>::get_ids(&sender);
+							if number - 4320 > blocknum2 {
+								pallet_sminer::Pallet::<T>::sub_power(peerid, res.size_type);
+								pallet_sminer::Pallet::<T>::sub_space(peerid, res.size_type);
+								let rmt = <PrePoolD<T>>::get(&sender, key2).unwrap();
+								<BlockNumberD<T>>::mutate(&sender, |s_opt| {
+									let s = s_opt.as_mut().unwrap();
+									s.block_num = Some(s.block_num.unwrap() - rmt.block_num.unwrap());
+									s.total_num = s.total_num - 1;
+							}
 								);
 								<ConProofInfoC<T>>::mutate(&sender, |s|{
-									for i in 0..(*s).len() {
-										let v = (*s).get(i);
+									for i in 0..s.len() {
+										let v = s.get(i);
 										if v.unwrap().segment_id == key2 {
-											(*s).remove(i);
+											s.remove(i);
 											break;
 										}
 									}
@@ -513,7 +575,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(50_000_000)]
-		pub fn intent_submit(origin: OriginFor<T>, size_type: u8, submit_type: u8) -> DispatchResult {
+		pub fn intent_submit(origin: OriginFor<T>, size_type: u8, submit_type: u8, peerid: u64, uncid: Vec<Vec<u8>>, hash: Vec<u8>, shardhash: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 			//call to generate random number
@@ -568,14 +630,26 @@ pub mod pallet {
 							block_num: None,
 						}
 					);
-					<ParamSetC<T>>::insert(
-						&sender,
-						ParamInfo {
-							peer_id,
-							segment_id,
-							rand: random,
-						}
-					);
+					let silce_info = FileSilceInfo {
+						peer_id: peerid,
+						segment_id: segment_id,
+						uncid: uncid,
+						rand: random,
+						hash: hash,
+						shardhash: shardhash,
+					};
+					let acc = pallet_sminer::Pallet::<T>::get_acc(peerid);
+					if <MinerHoldSlice<T>>::contains_key(&acc) {
+						<MinerHoldSlice<T>>::mutate(&acc, |s| (*s).push(silce_info));
+					} else {
+						let mut value: Vec<FileSilceInfo> = Vec::new();
+						value.push(silce_info);
+						<MinerHoldSlice<T>>::insert(
+							&acc,
+							value
+						)
+					}
+					
 				}
 				_ => {
 					ensure!(false, Error::<T>::SubmitTypeError);
@@ -585,9 +659,9 @@ pub mod pallet {
 			Ok(())
 		}
 
-		//PoSt intent
 		#[pallet::weight(50_000_000)]
 		pub fn intent_submit_po_st(origin: OriginFor<T>, segment_id: u64, size_type: u8, submit_type: u8) -> DispatchResult {
+			//PoSt intent
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 			//call to generate random number
@@ -665,34 +739,36 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 			ensure!(<VerPoolA<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
-			VerPoolA::<T>::mutate(&sender, segment_id, |s| {
-				(*s).is_ready = true;
-				(*s).proof = Some(proof.clone());
-				(*s).sealed_cid = Some(sealed_cid.clone());
-				(*s).block_num = Some(<frame_system::Pallet<T>>::block_number());
-				let s = UnverifiedPool{
+			VerPoolA::<T>::mutate(&sender, segment_id, |s_opt| {
+				let s = s_opt.as_mut().unwrap();
+				s.is_ready = true;
+				s.proof = Some(proof.clone());
+				s.sealed_cid = Some(sealed_cid.clone());
+				s.block_num = Some(<frame_system::Pallet<T>>::block_number());
+				let x = UnverifiedPool{
 					acc: sender.clone(), 
 					peer_id: peer_id, 
 					segment_id: segment_id, 
 					proof: proof.clone(), 
 					sealed_cid: sealed_cid.clone(), 
-					rand: (*s).rand, 
-					size_type: (*s).size_type,
+					rand: s.rand, 
+					size_type: s.size_type,
 				};
-				UnVerifiedA::<T>::mutate(|a| (*a).push(s));
+				UnVerifiedA::<T>::mutate(|a| (*a).push(x));
 			});
-			Self::deposit_event(Event::<T>::VPASubmitted(peer_id, segment_id));	
+			Self::deposit_event(Event::<T>::VPASubmitted(peer_id, segment_id));
 			Ok(())
 		}
 
 		#[pallet::weight(50_000_000)]
 		pub fn verify_in_vpa(origin: OriginFor<T>, peer_id: u64, segment_id: u64, result: bool) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_signed(origin)?;
+			let sender = pallet_sminer::Pallet::<T>::get_acc(peer_id);
 			//-------------------here needs a check func.
 
 			ensure!(<VerPoolA<T>>::contains_key(&sender, segment_id), Error::<T>::NotExistInVPA);
 
-			let vpa = VerPoolA::<T>::get(&sender, segment_id);
+			let vpa = VerPoolA::<T>::get(&sender, segment_id).unwrap();
 
 			ensure!(vpa.is_ready, Error::<T>::NotReadyInVPA);
 			
@@ -727,13 +803,14 @@ pub mod pallet {
 						}
 					);
 				} else {
-					<BlockNumberB<T>>::mutate(&sender, |s| {
-						(*s).total_num = (*s).total_num + 1;
+					<BlockNumberB<T>>::mutate(&sender, |s_opt| {
+						let s = s_opt.as_mut().unwrap();
+						s.total_num = s.total_num + 1;
 					});
 				}
-				pallet_sminer::Pallet::<T>::add_power(&sender, vpa.size_type);
+				pallet_sminer::Pallet::<T>::add_power(peer_id, vpa.size_type);
 				let size = vpa.size_type;
-				let bo = VerPoolA::<T>::get(&sender, segment_id);
+				let bo = VerPoolA::<T>::get(&sender, segment_id).unwrap();
 				let sealed_cid = bo.sealed_cid.unwrap();
 				if <ConProofInfoA<T>>::contains_key(&sender) {
 					<ConProofInfoA<T>>::mutate(sender.clone(), |v| {
@@ -743,7 +820,7 @@ pub mod pallet {
 							sealed_cid: sealed_cid,
 							size_type: size,
 						};
-						(*v).push(value)
+						(*v).push(value);
 					});
 				} else {
 					let mut v: Vec<ContinuousProofPool> = Vec::new();
@@ -762,32 +839,28 @@ pub mod pallet {
 			}
 
 			<VerPoolA<T>>::remove(&sender, segment_id);
-			let mut ua = UnVerifiedA::<T>::get();
-			let mut k = 0;
-			for i in ua.clone().iter() {
-				if i.peer_id == peer_id && i.segment_id == segment_id {
-					ua.remove(k);
-				}
-				k += 1;
-			}
-			UnVerifiedA::<T>::put(ua);
+
+			let ua = UnVerifiedA::<T>::get();
+			let res = Self::unverify_remove(ua, peer_id, segment_id);
+			UnVerifiedA::<T>::put(res);
+
 			Self::deposit_event(Event::<T>::VPAVerified(peer_id, segment_id));
 			Ok(())
 		}
 
-		//B: Idle space-time proof
 		#[pallet::weight(50_000_000)]
 		pub fn submit_to_vpb(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<u8>, sealed_cid: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 			ensure!(<VerPoolB<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
 
-			VerPoolB::<T>::mutate(&sender, segment_id, |s| {
-				(*s).is_ready = true;
-				(*s).proof = Some(proof.clone());
-				(*s).sealed_cid = Some(sealed_cid.clone());
-				(*s).block_num = Some(<frame_system::Pallet<T>>::block_number());
-				let s = UnverifiedPool{
+			VerPoolB::<T>::mutate(&sender, segment_id, |s_opt| {
+				let s = s_opt.as_mut().unwrap();
+				s.is_ready = true;
+				s.proof = Some(proof.clone());
+				s.sealed_cid = Some(sealed_cid.clone());
+				s.block_num = Some(<frame_system::Pallet<T>>::block_number());
+				let x = UnverifiedPool{
 					acc: sender.clone(), 
 					peer_id: peer_id, 
 					segment_id: segment_id, 
@@ -796,45 +869,44 @@ pub mod pallet {
 					rand: (*s).rand, 
 					size_type: (*s).size_type,
 				};
-				UnVerifiedB::<T>::mutate(|a| (*a).push(s));
+				UnVerifiedB::<T>::mutate(|a| (*a).push(x));
 			});
 
 			Self::deposit_event(Event::<T>::VPBSubmitted(peer_id, segment_id));	
 			Ok(())
 		}
 
+		//B: Idle space-time proof
 		#[pallet::weight(50_000_000)]
 		pub fn verify_in_vpb(origin: OriginFor<T>, peer_id: u64, segment_id: u64, result: bool) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_signed(origin)?;
+			let sender = pallet_sminer::Pallet::<T>::get_acc(peer_id);
+
 			let now_block = <frame_system::Pallet<T>>::block_number();
 			//-------------------here needs a check func.
+			ensure!(<VerPoolB<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
 
-			ensure!(<VerPoolB<T>>::contains_key(&sender, segment_id), Error::<T>::NotExistInVPB);
-
-			let vpb = VerPoolB::<T>::get(&sender, segment_id);
+			let vpb = VerPoolB::<T>::get(&sender, segment_id).unwrap();
 
 			ensure!(vpb.is_ready, Error::<T>::NotReadyInVPB);
 			
 			if result {
-				PrePoolB::<T>::mutate(&sender, segment_id, |s| {
-					<BlockNumberB<T>>::mutate(&sender, |a| {
-						(*a).block_num = Some((*a).block_num.unwrap() - (*s).block_num.unwrap() + now_block);
+				PrePoolB::<T>::mutate(&sender, segment_id, |s_opt| {
+					let s = s_opt.as_mut().unwrap();
+					<BlockNumberB<T>>::mutate(&sender, |a_opt| {
+						let a = a_opt.as_mut().unwrap();
+						a.block_num = Some(a.block_num.unwrap() - s.block_num.unwrap() + now_block);
 					});
-					(*s).proof = Some(vpb.proof.unwrap());
-					(*s).sealed_cid = Some(vpb.sealed_cid.unwrap());
-					(*s).block_num = Some(now_block);
+					s.proof = Some(vpb.proof.unwrap());
+					s.sealed_cid = Some(vpb.sealed_cid.unwrap());
+					s.block_num = Some(now_block);
 				});
 			}
 			<VerPoolB<T>>::remove(&sender, segment_id);
-			let mut ua = UnVerifiedB::<T>::get();
-			let mut k = 0;
-			for i in ua.clone().iter() {
-				if i.peer_id == peer_id && i.segment_id == segment_id {
-					ua.remove(k);
-				}
-				k += 1;
-			}
-			UnVerifiedB::<T>::put(ua);
+
+			let ua = UnVerifiedB::<T>::get();
+			let res = Self::unverify_remove(ua, peer_id, segment_id);
+			UnVerifiedB::<T>::put(res);
 
 			Self::deposit_event(Event::<T>::VPBVerified(peer_id, segment_id));
 			Ok(())
@@ -842,27 +914,51 @@ pub mod pallet {
 
 		//C start
 		#[pallet::weight(50_000_000)]
-		pub fn submit_to_vpc(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<u8>, sealed_cid: Vec<u8>) -> DispatchResult {
+		pub fn submit_to_vpc(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<Vec<u8>>, sealed_cid: Vec<Vec<u8>>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			//-------------------here needs a check func.
 			ensure!(<VerPoolC<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
 			
-			VerPoolC::<T>::mutate(&sender, segment_id, |s| {
-				(*s).is_ready = true;
-				(*s).proof = Some(proof.clone());
-				(*s).sealed_cid = Some(sealed_cid.clone());
-				(*s).block_num = Some(<frame_system::Pallet<T>>::block_number());
-				let s = UnverifiedPool{
+			VerPoolC::<T>::mutate(&sender, segment_id, |s_opt| {
+				let s = s_opt.as_mut().unwrap();
+				s.is_ready = true;
+				s.proof = Some(proof.clone());
+				s.sealed_cid = Some(sealed_cid.clone());
+				s.block_num = Some(<frame_system::Pallet<T>>::block_number());
+			});
+
+			let mut flag: bool = false;
+			let unc = UnVerifiedC::<T>::get();
+			for i in unc.iter() {
+				if i.peer_id == peer_id && i.segment_id == segment_id {
+					flag = true;
+					break;
+				}
+			}
+			if flag {
+				ensure!(false, Error::<T>::LastSubmitUnVerfy);
+			} else {
+				let v = VerPoolC::<T>::get(&sender, segment_id).unwrap();
+				let value = MinerHoldSlice::<T>::get(&sender);
+				let mut uncid: Vec<Vec<u8>> = Vec::new();
+				for i in value {
+					if i.segment_id == segment_id {
+						uncid = i.uncid;
+					}
+				}
+				let x = UnverifiedPoolVec{
 					acc: sender.clone(), 
 					peer_id: peer_id, 
 					segment_id: segment_id, 
 					proof: proof.clone(), 
 					sealed_cid: sealed_cid.clone(), 
-					rand: (*s).rand, 
-					size_type: (*s).size_type,
+					uncid: uncid,
+					rand: v.rand, 
+					size_type: v.size_type,
 				};
-				UnVerifiedC::<T>::mutate(|a| (*a).push(s));
-			});
+				UnVerifiedC::<T>::mutate(|a| (*a).push(x));
+			}
+			
 
 			Self::deposit_event(Event::<T>::VPCSubmitted(peer_id, segment_id));	
 			Ok(())
@@ -870,12 +966,12 @@ pub mod pallet {
 
 		#[pallet::weight(50_000_000)]
 		pub fn verify_in_vpc(origin: OriginFor<T>, peer_id: u64, segment_id: u64, result: bool) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_signed(origin)?;
+			let sender = pallet_sminer::Pallet::<T>::get_acc(peer_id);
 			//-------------------here needs a check func.
-
 			ensure!(<VerPoolC<T>>::contains_key(&sender, segment_id), Error::<T>::NotExistInVPC);
 
-			let vpc = VerPoolC::<T>::get(&sender, segment_id);
+			let vpc = VerPoolC::<T>::get(&sender, segment_id).unwrap();
 
 			ensure!(vpc.is_ready, Error::<T>::NotReadyInVPC);
 			
@@ -910,34 +1006,47 @@ pub mod pallet {
 						}
 					);
 				} else {
-					<BlockNumberD<T>>::mutate(&sender, |s| {
+					<BlockNumberD<T>>::mutate(&sender, |s_opt| {
+						let s = s_opt.as_mut().unwrap();
 						(*s).total_num = (*s).total_num + 1;
 					});
 				}
-				pallet_sminer::Pallet::<T>::add_power(&sender, vpc.size_type);
+				pallet_sminer::Pallet::<T>::add_power(peer_id, vpc.size_type);
+				pallet_sminer::Pallet::<T>::add_space(peer_id, vpc.size_type);
 				// <ConProofInfoC<T>>::insert(
 				// 	&sender,
 	
 				// );
 				let size = vpc.size_type;
-				let bo = VerPoolC::<T>::get(&sender, segment_id);
+				let bo = VerPoolC::<T>::get(&sender, segment_id).unwrap();
 				let sealed_cid = bo.sealed_cid.unwrap();
+
+				let mut hash: Vec<u8> = Vec::new();
+				let value = MinerHoldSlice::<T>::get(&sender);
+				for i in value {
+					if i.segment_id == segment_id {
+						hash = i.hash;
+					}
+				}
+
 				if <ConProofInfoC<T>>::contains_key(&sender) {
 					<ConProofInfoC<T>>::mutate(sender.clone(), |v|{
-						let value = ContinuousProofPool {
+						let value = ContinuousProofPoolVec {
 							peer_id: peer_id,
 							segment_id: segment_id,
 							sealed_cid: sealed_cid.clone(),
+							hash: hash,
 							size_type: size,
 						};
 						(*v).push(value)
 					});
 				} else {
-					let mut v: Vec<ContinuousProofPool> = Vec::new();
-					let value = ContinuousProofPool {
+					let mut v: Vec<ContinuousProofPoolVec> = Vec::new();
+					let value = ContinuousProofPoolVec {
 						peer_id: peer_id,
 						segment_id: segment_id,
 						sealed_cid: sealed_cid,
+						hash: hash,
 						size_type: size,
 					};
 					v.push(value);
@@ -946,17 +1055,25 @@ pub mod pallet {
 						v
 					);
 				}
+				
+				<MinerHoldSlice<T>>::mutate(&sender, |s|{
+					//let s = s_opt.as_mut().unwrap();
+					let mut k = 0;
+					for i in s.iter(){
+						if i.segment_id == segment_id {
+							break;
+						}
+						k += 1;
+					}
+					s.remove(k);
+				});
+				
 			}
 			<VerPoolC<T>>::remove(&sender, segment_id);
-			let mut ua = UnVerifiedC::<T>::get();
-			let mut k = 0;
-			for i in ua.clone().iter() {
-				if i.peer_id == peer_id && i.segment_id == segment_id {
-					ua.remove(k);
-				}
-				k += 1;
-			}
-			UnVerifiedC::<T>::put(ua);
+
+			let ua = UnVerifiedC::<T>::get();
+			let res = Self::unverify_remove_vec(ua, peer_id, segment_id);
+			UnVerifiedC::<T>::put(res);
 
 			Self::deposit_event(Event::<T>::VPCVerified(peer_id, segment_id));
 			Ok(())
@@ -964,18 +1081,19 @@ pub mod pallet {
 
 		//D: start
 		#[pallet::weight(50_000_000)]
-		pub fn submit_to_vpd(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<u8>, sealed_cid: Vec<u8>) -> DispatchResult {
+		pub fn submit_to_vpd(origin: OriginFor<T>, peer_id: u64, segment_id: u64, proof: Vec<Vec<u8>>, sealed_cid: Vec<Vec<u8>>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let now_block = <frame_system::Pallet<T>>::block_number();
 			//-------------------here needs a check func.
 			ensure!(<VerPoolD<T>>::contains_key(&sender, segment_id), Error::<T>::NoIntentSubmitYet);
 
-			VerPoolD::<T>::mutate(&sender, segment_id, |s| {
-				(*s).is_ready = true;
-				(*s).proof = Some(proof.clone());
-				(*s).sealed_cid = Some(sealed_cid.clone());
-				(*s).block_num = Some(now_block);
-				let s = UnverifiedPool{
+			VerPoolD::<T>::mutate(&sender, segment_id, |s_opt| {
+				let s = s_opt.as_mut().unwrap();
+				s.is_ready = true;
+				s.proof = Some(proof.clone());
+				s.sealed_cid = Some(sealed_cid.clone());
+				s.block_num = Some(now_block);
+				let x = UnverifiedPoolVecD{
 					acc: sender.clone(), 
 					peer_id: peer_id, 
 					segment_id: segment_id, 
@@ -984,7 +1102,7 @@ pub mod pallet {
 					rand: (*s).rand, 
 					size_type: (*s).size_type,
 				};
-				UnVerifiedD::<T>::mutate(|a| (*a).push(s));
+				UnVerifiedD::<T>::mutate(|a| (*a).push(x));
 			});
 
 			Self::deposit_event(Event::<T>::VPDSubmitted(peer_id, segment_id));	
@@ -993,36 +1111,34 @@ pub mod pallet {
 
 		#[pallet::weight(50_000_000)]
 		pub fn verify_in_vpd(origin: OriginFor<T>, peer_id: u64, segment_id: u64, result: bool) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_signed(origin)?;
+			let sender = pallet_sminer::Pallet::<T>::get_acc(peer_id);
 			let now_block = <frame_system::Pallet<T>>::block_number();
 			//-------------------here needs a check func.
 
 			ensure!(<VerPoolD<T>>::contains_key(&sender, segment_id), Error::<T>::NotExistInVPD);
 
-			let vpd = VerPoolD::<T>::get(&sender, segment_id);
+			let vpd = VerPoolD::<T>::get(&sender, segment_id).unwrap();
 
 			ensure!(vpd.is_ready, Error::<T>::NotReadyInVPD);
 			
 			if result {
-				PrePoolD::<T>::mutate(&sender, segment_id, |s| {
-					<BlockNumberB<T>>::mutate(&sender, |a| {
-						(*a).block_num = Some((*a).block_num.unwrap() - (*s).block_num.unwrap() + now_block);
+				PrePoolD::<T>::mutate(&sender, segment_id, |s_opt| {
+					let s = s_opt.as_mut().unwrap();
+					<BlockNumberB<T>>::mutate(&sender, |a_opt| {
+						let a = a_opt.as_mut().unwrap();
+						a.block_num = Some(a.block_num.unwrap() - s.block_num.unwrap() + now_block);
 					});
-					(*s).proof = Some(vpd.proof.unwrap());
-					(*s).sealed_cid = Some(vpd.sealed_cid.unwrap());
-					(*s).block_num = Some(now_block);
+					s.proof = Some(vpd.proof.unwrap());
+					s.sealed_cid = Some(vpd.sealed_cid.unwrap());
+					s.block_num = Some(now_block);
 				});
 			}
 			<VerPoolD<T>>::remove(&sender, segment_id);
-			let mut ua = UnVerifiedD::<T>::get();
-			let mut k = 0;
-			for i in ua.clone().iter() {
-				if i.peer_id == peer_id && i.segment_id == segment_id {
-					ua.remove(k);
-				}
-				k += 1;
-			}
-			UnVerifiedD::<T>::put(ua);
+
+			let ua = UnVerifiedD::<T>::get();
+			let res = Self::unverify_remove_vec_d(ua, peer_id, segment_id);
+			UnVerifiedD::<T>::put(res);
 
 			Self::deposit_event(Event::<T>::VPDVerified(peer_id, segment_id));
 			Ok(())
@@ -1038,6 +1154,43 @@ impl<T: Config> Pallet<T> {
 			.expect("secure hashes should always be bigger than u32; qed");
 		random_number
 	}
+
+	fn unverify_remove(mut list: Vec<UnverifiedPool<T>>, peer_id: u64, segment_id: u64) -> Vec<UnverifiedPool<T>>{
+		let mut k = 0;
+		for i in list.iter() {
+			if i.peer_id == peer_id && i.segment_id == segment_id {
+				break;
+			}
+			k += 1;
+		}
+		list.remove(k);
+		list
+	}
+
+	fn unverify_remove_vec(mut list: Vec<UnverifiedPoolVec<T>>, peer_id: u64, segment_id: u64) -> Vec<UnverifiedPoolVec<T>>{
+		let mut k = 0;
+		for i in list.iter() {
+			if i.peer_id == peer_id && i.segment_id == segment_id {
+				break;
+			}
+			k += 1;
+		}
+		list.remove(k);
+		list
+	}
+
+	fn unverify_remove_vec_d(mut list: Vec<UnverifiedPoolVecD<T>>, peer_id: u64, segment_id: u64) -> Vec<UnverifiedPoolVecD<T>>{
+		let mut k = 0;
+		for i in list.iter() {
+			if i.peer_id == peer_id && i.segment_id == segment_id {
+				break;
+			}
+			k += 1;
+		}
+		list.remove(k);
+		list
+	}
+
 }
 
 // fn choose_winner(total: u32) -> u32 {
