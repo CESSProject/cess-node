@@ -588,10 +588,10 @@ pub mod pallet {
 			};
 			if size == 0 {
 				ensure!(false, Error::<T>::SizeTypeError);
-			}
-			let (peer_id, segment_id) = pallet_sminer::Pallet::<T>::get_ids(&sender);
+			}	
 			match submit_type {
 				1u8 => {
+					let (peer_id, segment_id) = pallet_sminer::Pallet::<T>::get_ids(&sender);
 					ensure!(!<VerPoolA<T>>::contains_key(&sender, segment_id), Error::<T>::YetIntennt);
 					<VerPoolA<T>>::insert(
 						&sender,
@@ -614,8 +614,11 @@ pub mod pallet {
 							rand: random,
 						}
 					);
+					Self::deposit_event(Event::<T>::ParamSet(peer_id, segment_id, random));
 				}
 				2u8 => {
+					let acc = pallet_sminer::Pallet::<T>::get_acc(peerid);
+					let segment_id = pallet_sminer::Pallet::<T>::get_segmentid(&acc);
 					ensure!(!<VerPoolC<T>>::contains_key(&sender, segment_id), Error::<T>::YetIntennt);
 					<VerPoolC<T>>::insert(
 						&sender,
@@ -638,7 +641,6 @@ pub mod pallet {
 						hash: hash,
 						shardhash: shardhash,
 					};
-					let acc = pallet_sminer::Pallet::<T>::get_acc(peerid);
 					if <MinerHoldSlice<T>>::contains_key(&acc) {
 						<MinerHoldSlice<T>>::mutate(&acc, |s| (*s).push(silce_info));
 					} else {
@@ -654,8 +656,7 @@ pub mod pallet {
 				_ => {
 					ensure!(false, Error::<T>::SubmitTypeError);
 				}
-			}
-			Self::deposit_event(Event::<T>::ParamSet(peer_id, segment_id, random));
+			}	
 			Ok(())
 		}
 

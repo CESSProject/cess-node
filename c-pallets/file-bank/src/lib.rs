@@ -5,6 +5,7 @@ use frame_support::traits::{Currency, OnUnbalanced, ReservableCurrency, Existenc
 pub use pallet::*;
 mod benchmarking;
 pub mod weights;
+use sp_std::convert::TryInto;
 
 use scale_info::TypeInfo;
 use sp_runtime::{
@@ -188,11 +189,16 @@ pub mod pallet {
 			ensure!((<File<T>>::contains_key(fileid.clone())), Error::<T>::FileNonExistent);
 
 			
-
+			
 			if <Invoice<T>>::contains_key(fileid.clone()) {
 				Self::deposit_event(Event::<T>::Purchased(sender.clone(), fileid.clone()));
 			} else {
-				T::Currency::transfer(&sender, &group_id.owner, group_id.downloadfee.clone(), AllowDeath)?;
+				let zh = TryInto::<u128>::try_into(group_id.downloadfee).ok().unwrap();
+				let umoney = zh * 8 / 10;
+				let money: Option<BalanceOf<T>> = umoney.try_into().ok();
+				let acc = T::FilbakPalletId::get().into_account();
+				T::Currency::transfer(&sender, &group_id.owner, money.unwrap(), AllowDeath)?;
+				T::Currency::transfer(&sender, &acc, group_id.downloadfee - money.unwrap(), AllowDeath)?;
 				<Invoice<T>>::insert(
 					invoice,
 					0

@@ -32,6 +32,7 @@ use frame_system::{self as system};
 use frame_support::{dispatch::{Dispatchable, DispatchResult}, transactional, PalletId};
 type AccountOf<T> = <T as frame_system::Config>::AccountId;
 type BalanceOf<T> = <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
 
 #[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 pub struct MinerInfo {
@@ -68,7 +69,6 @@ pub struct StorageInfo {
 	available_storage: u128,
 	time: u128,
 }
-
 
 /// The custom struct for miner table of block explorer.
 #[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
@@ -107,6 +107,32 @@ pub struct MinerStatInfo<T: pallet::Config> {
 	sum_files: u128, 
 }
 
+/// The custom struct for storing info of storage CalculateRewardOrder.
+#[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct CalculateRewardOrder <T: pallet::Config>{
+	calculate_reward:u128,
+	start_t: BlockNumberOf<T>,
+	deadline: BlockNumberOf<T>,
+}
+
+/// The custom struct for storing info of storage RewardClaim.
+#[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct RewardClaim <T: pallet::Config>{
+	total_reward: BalanceOf<T>,
+	total_rewards_currently_available: BalanceOf<T>,
+	have_to_receive: BalanceOf<T>,
+	current_availability: BalanceOf<T>,
+	total_not_receive: BalanceOf<T>,
+}
+
+/// The custom struct for storing info of storage FaucetRecord.
+#[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct FaucetRecord <T: pallet::Config>{
+	last_claim_time: BlockNumberOf<T>,
+}
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -154,6 +180,23 @@ pub mod pallet {
 		UpdateAddressSucc(AccountOf<T>),
 
 		SetEtcdSucc(AccountOf<T>),
+		
+		/// An account Add files
+		Add(AccountOf<T>),
+		/// An account Deleted files
+		Del(AccountOf<T>),
+		/// An account Update the file
+		Update(AccountOf<T>),
+		/// An account Get the file
+		Get(AccountOf<T>),
+		/// Scheduled Task Execution
+		TimedTask(),
+		/// Users to withdraw money
+		DrawMoney(AccountOf<T>),
+		/// Users to withdraw faucet money
+		DrawFaucetMoney(),
+		/// User recharges faucet
+		FaucetTopUpMoney(AccountOf<T>),
 	}
 
 	/// Error for the sminer pallet.
@@ -171,6 +214,18 @@ pub mod pallet {
 		Overflow,
 
 		NotOwner,
+
+		NotExisted,	
+
+		LackOfPermissions,
+
+		BeyondClaim,
+
+		LessThan24Hours,
+
+		ConversionError,
+
+		OffchainUnsignedTxError,
 	}
 
 	/// The hashmap for info of storage miners.
@@ -198,12 +253,20 @@ pub mod pallet {
 	pub(super) type EtcdRegisterOwner<T: Config> = StorageValue<_, Vec<T::AccountId>, ValueQuery>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn etcd_owner)]
+	pub(super) type EtcdOwner<T: Config> = StorageValue<_, T::AccountId, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn etcd_register)]
 	pub(super) type EtcdRegister<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn etcd_token)]
 	pub(super) type EtcdToken<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn service_port)]
+	pub(super) type ServicePort<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
 
 	/// The total power of all storage miners.
 	#[pallet::storage]
@@ -247,6 +310,21 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn miner_stat_value)]
 	pub(super) type MinerStatValue<T: Config> = StorageValue<_, MinerStatInfo<T>>;
+
+	/// The hashmap for info of storage miners.
+	#[pallet::storage]
+	#[pallet::getter(fn calculate_reward_order)]
+	pub(super) type CalculateRewardOrderMap<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, Vec<CalculateRewardOrder<T>>, ValueQuery>;
+
+	/// The hashmap for checking registered or not.
+	#[pallet::storage]
+	#[pallet::getter(fn reward_claim)]
+	pub(super) type RewardClaimMap<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, RewardClaim<T>>;
+
+	/// The hashmap for checking registered or not.
+	#[pallet::storage]
+	#[pallet::getter(fn faucet_record)]
+	pub(super) type FaucetRecordMap<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, FaucetRecord<T>>;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -331,9 +409,9 @@ pub mod pallet {
 
 			MinerStatValue::<T>::mutate(|s_opt| {
 				let mut msi = MinerStatInfo::<T> {
-					total_miners: 0u64,
-					active_miners: 0u64,
-					staking: BalanceOf::<T>::from(0 as u32),
+					total_miners: 1u64,
+					active_miners: 1u64,
+					staking: staking_val.clone(),
 					miner_reward: BalanceOf::<T>::from(0 as u32),
 					sum_files: 0u128,
 				};
@@ -389,23 +467,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(50_000_000)]
-		pub fn initi(origin: OriginFor<T>) -> DispatchResult {
-			//sudo call
-			let sender = ensure_signed(origin)?;
-			let value = BalanceOf::<T>::from(0 as u32);
-			let mst = MinerStatInfo::<T> {
-				total_miners: 0u64,
-				active_miners: 0u64,
-				staking: value,
-				miner_reward: value,
-				sum_files: 0u128,
-			};
-			<MinerStatValue<T>>::put(mst);
-			Ok(())
-		}
-
-		#[pallet::weight(50_000_000)]
-		pub fn setaddress(origin: OriginFor<T>, address1: T::AccountId, address2: T::AccountId, address3: T::AccountId) -> DispatchResult {
+		pub fn setaddress(origin: OriginFor<T>, address1: T::AccountId, address2: T::AccountId, address3: T::AccountId, address4: T::AccountId) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let v = <Control<T>>::get();
 			if v == 0 {
@@ -418,6 +480,7 @@ pub mod pallet {
 				EtcdRegisterOwner::<T>::mutate(|s|{
 					s.push(address3);
 				});
+				EtcdOwner::<T>::put(address4);
 				<Control<T>>::put(1);
 			}
 			Ok(())
@@ -477,16 +540,30 @@ pub mod pallet {
 		pub fn setetcdtoken(origin: OriginFor<T>, token: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let mut flag: bool = false;
-			<EtcdRegisterOwner<T>>::mutate(|s| {
-				for i in s {
-					if sender == i.clone() {
-						flag = true;
-						break;
-					}
-				}
-			});
+			let address = <EtcdOwner<T>>::get();
+			if sender == address {
+				flag = true;
+			}
 			if flag {
 				<EtcdToken<T>>::put(token);
+				Self::deposit_event(Event::<T>::SetEtcdSucc(sender));
+			} else {
+				ensure!(flag ,Error::<T>::NotOwner);
+			}
+			Ok(())
+		}
+
+
+		#[pallet::weight(50_000_000)]
+		pub fn setserviceport(origin: OriginFor<T>, serviceport: Vec<u8>) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+			let mut flag: bool = false;
+			let address = <EtcdOwner<T>>::get();
+			if sender == address {
+				flag = true;
+			}
+			if flag {
+				<ServicePort<T>>::put(serviceport);
 				Self::deposit_event(Event::<T>::SetEtcdSucc(sender));
 			} else {
 				ensure!(flag ,Error::<T>::NotOwner);
@@ -525,6 +602,7 @@ pub mod pallet {
 			info1.push(value);
 
 			storage_info_vec.append(&mut info1);
+			storage_info_vec.remove(0);
 
 			<StorageInfoVec<T>>::put(storage_info_vec);
 			Self::deposit_event(Event::<T>::TimingStorageSpace());
@@ -543,7 +621,7 @@ pub mod pallet {
 				frame_system::RawOrigin::Root.into(),
 				Call::timing_storage_space{}.into(),
 			).is_err() {
-				frame_support::print("LOGIC ERROR: timed_task_receive_award/schedule_named failed");
+				frame_support::print("LOGIC ERROR: timing_storage_space/schedule_named failed");
 			}
 
 			Self::deposit_event(Event::<T>::AddScheduledTask(sender.clone()));
@@ -562,7 +640,7 @@ pub mod pallet {
 			
 			let mut i = 0;
 			while i < 30 {
-				let tmp = TryInto::<u128>::try_into(now).ok().unwrap() - 86400*i;
+				let tmp = TryInto::<u128>::try_into(now).ok().unwrap() - 86400000*(30-i-1);
 
 				let value = StorageInfo{
 					used_storage: storage_info.used_storage,
@@ -579,6 +657,312 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::TimingStorageSpace());
 			Ok(())
 		}
+		
+		#[pallet::weight(50_000_000)]
+		pub fn timed_increase_rewards(origin: OriginFor<T>) -> DispatchResult {
+			let total_power = <TotalPower<T>>::get();
+			for (peerid, detail) in <MinerDetails<T>>::iter() {
+				// Call::add_reward_order::<T> { acc: detail.address, calculate_reward: 750000000000000000*detail.power/total_power };
+				Self::add_reward_order1(detail.address,750000000000000000*detail.power/total_power);
+			}
+			Self::deposit_event(Event::<T>::TimedTask());
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn timing_task_increase_power_rewards(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			if T::SScheduler::schedule_named(
+				(DEMOCRACY_ID).encode(),
+				DispatchTime::At(when),
+				Some(( cycle, degree)),
+				63,
+				frame_system::RawOrigin::Root.into(),
+				Call::timed_increase_rewards{}.into(),
+			).is_err() {
+				frame_support::print("LOGIC ERROR: timed_increase_rewards/schedule_named failed");
+			}
+
+			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			Ok(())
+		}
+		
+		// #[pallet::weight(50_000_000)]
+		// pub fn add_reward_order(origin: OriginFor<T>, acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
+		// 	let sender = ensure_signed(origin)?;
+
+		// 	let now = <frame_system::Pallet<T>>::block_number();
+		// 	// With block timing, 180 days =2,592,000 blocks
+		// 	let deadline = now + T::BlockNumber::from(2592000u32);
+
+		// 	if !<CalculateRewardOrderMap<T>>::contains_key(&acc) {
+		// 		let order: Vec<CalculateRewardOrder<T>> = vec![CalculateRewardOrder::<T>{
+		// 			calculate_reward:calculate_reward,
+		// 			start_t: now,
+		// 			deadline: deadline,
+		// 		}];
+
+		// 		<CalculateRewardOrderMap<T>>::insert(
+		// 			acc,
+		// 			order,
+		// 		);
+		// 	} else {
+		// 		let order1: CalculateRewardOrder<T> = CalculateRewardOrder::<T>{
+		// 			calculate_reward:calculate_reward,
+		// 			start_t: now,
+		// 			deadline: deadline,
+		// 		};
+
+		// 		// Obtain user computing power order
+		// 		let mut order_vec = CalculateRewardOrderMap::<T>::get(&acc);
+
+		// 		order_vec.push(order1);
+
+		// 		<CalculateRewardOrderMap<T>>::insert(
+		// 			acc,
+		// 			order_vec,
+		// 		);
+		// 	}
+
+		// 	Self::deposit_event(Event::<T>::Add(sender.clone()));
+		// 	Ok(())
+		// }
+
+		#[pallet::weight(50_000_000)]
+		pub fn del_reward_order(origin: OriginFor<T>,acc: AccountOf<T>, order_num: u128) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			ensure!(CalculateRewardOrderMap::<T>::contains_key(&acc), Error::<T>::NotExisted);
+
+			// ensure!(group_id.user == sender.clone(), Error::<T>::LackOfPermissions);
+
+			// Obtain user computing power order
+			let mut order_vec = CalculateRewardOrderMap::<T>::get(&acc);
+
+			order_vec.remove(order_num.try_into().unwrap());
+
+			<CalculateRewardOrderMap<T>>::insert(
+				acc,
+				order_vec,
+			);
+
+			Self::deposit_event(Event::<T>::Del(sender.clone()));
+			Ok(())
+		}
+
+		// #[pallet::weight(50_000_000)]
+		// pub fn user_receive_award(origin: OriginFor<T>, award: BalanceOf<T>) -> DispatchResult {
+		// 	let sender = ensure_signed(origin)?;
+			
+		// 	let acc = Self::get_acc(sender);
+
+		// 	ensure!(RewardClaimMap::<T>::contains_key(&sender), Error::<T>::NotExisted);
+			
+		// 	let reward_pot = T::PalletId::get().into_account();
+
+		// 	let reward_claim1 = RewardClaimMap::<T>::get(&sender).unwrap();
+			
+		// 	ensure!((reward_claim1.have_to_receive + award) <= reward_claim1.total_rewards_currently_available, Error::<T>::BeyondClaim);
+			
+		// 	<T as pallet::Config>::Currency::transfer(&reward_pot, &acc, award, AllowDeath)?;
+
+		// 	RewardClaimMap::<T>::mutate(&sender, |reward_claim_opt| {
+		// 		let reward_claim = reward_claim_opt.as_mut().unwrap();
+		// 		reward_claim.have_to_receive = reward_claim.have_to_receive + award;
+		// 	});
+
+		// 	Self::deposit_event(Event::<T>::DrawMoney(sender.clone()));
+		// 	Ok(())
+		// }
+
+		#[pallet::weight(50_000_000)]
+		pub fn timed_user_receive_award1(origin: OriginFor<T>) -> DispatchResult {
+			for (peerid, info) in <MinerDetails<T>>::iter() {
+				let sender = info.address;
+				
+				let acc = info.beneficiary;
+
+				ensure!(RewardClaimMap::<T>::contains_key(&sender), Error::<T>::NotExisted);
+				
+				let reward_pot = T::PalletId::get().into_account();
+
+				let reward_claim1 = RewardClaimMap::<T>::get(&sender).unwrap();
+				
+				let award = reward_claim1.current_availability;
+
+				ensure!((reward_claim1.have_to_receive + award) <= reward_claim1.total_rewards_currently_available, Error::<T>::BeyondClaim);
+				
+				<T as pallet::Config>::Currency::transfer(&reward_pot, &acc, award, AllowDeath)?;
+
+				RewardClaimMap::<T>::mutate(&sender, |reward_claim_opt| {
+					let reward_claim = reward_claim_opt.as_mut().unwrap();
+					reward_claim.have_to_receive = reward_claim.have_to_receive + award;
+				});
+			}
+			// Self::deposit_event(Event::<T>::DrawMoney(sender.clone()));
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn timed_task_receive_award(_origin: OriginFor<T>) -> DispatchResult {
+			for (_acc, order_vec) in <CalculateRewardOrderMap<T>>::iter() {
+				let mut total:u128 = 0;
+
+				let now = <frame_system::Pallet<T>>::block_number();
+				let mut avail:BalanceOf<T> = 0u128.try_into().map_err(|_e| Error::<T>::ConversionError)?;
+
+				for i in &order_vec{
+					if i.deadline > now {
+						total += i.calculate_reward;
+						let tmp = TryInto::<u128>::try_into(now-i.start_t).ok().unwrap();
+						let day:u128 = tmp/28800+1;
+						avail += (i.calculate_reward*8/10/(180*day)).try_into().map_err(|_e| Error::<T>::ConversionError)?;
+					} else {
+						// Call::del_order(_acc,i);
+					}
+				}
+				let reward1:BalanceOf<T> = (total*2/10).try_into().map_err(|_e| Error::<T>::ConversionError)?;
+				let currently_available:BalanceOf<T> = reward1+avail;
+
+				let reward2:BalanceOf<T> = total.try_into().map_err(|_e| Error::<T>::ConversionError)?;
+				
+				if !<RewardClaimMap<T>>::contains_key(&_acc) {
+					<RewardClaimMap<T>>::insert(
+						_acc, 
+						RewardClaim::<T> {
+							total_reward: reward2,
+							total_rewards_currently_available: currently_available,
+							have_to_receive: 0u128.try_into().map_err(|_e| Error::<T>::ConversionError)?,
+							current_availability: currently_available,
+							total_not_receive: reward2,
+						}
+					);
+				} else {
+					RewardClaimMap::<T>::mutate(_acc, |reward_claim_opt| {
+						let reward_claim = reward_claim_opt.as_mut().unwrap();
+						reward_claim.total_reward = reward2;
+						reward_claim.total_rewards_currently_available = currently_available;
+						reward_claim.current_availability = currently_available - reward_claim.have_to_receive;
+						reward_claim.total_not_receive = reward2 - reward_claim.have_to_receive;
+					});
+				}
+			}
+
+			Self::deposit_event(Event::<T>::TimedTask());
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn timing_task_award(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			if T::SScheduler::schedule_named(
+				(DEMOCRACY_ID).encode(),
+				DispatchTime::At(when),
+				Some(( cycle, degree)),
+				63,
+				frame_system::RawOrigin::Root.into(),
+				Call::timed_task_receive_award{}.into(),
+			).is_err() {
+				frame_support::print("LOGIC ERROR: timed_task_receive_award/schedule_named failed");
+			}
+
+			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			Ok(())
+		}
+		
+		#[pallet::weight(50_000_000)]
+		pub fn punishment(origin: OriginFor<T>, acc: AccountOf<T>) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let reward_pot = T::PalletId::get().into_account();
+			
+			<T as pallet::Config>::Currency::transfer(&acc, &reward_pot, <T as pallet::Config>::Currency::total_balance(&acc), AllowDeath)?;
+
+			Self::deposit_event(Event::<T>::FaucetTopUpMoney(sender.clone()));
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn faucet_top_up(origin: OriginFor<T>, acc: AccountOf<T>, award: BalanceOf<T>) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			let reward_pot = T::PalletId::get().into_account();
+				
+			<T as pallet::Config>::Currency::transfer(&acc, &reward_pot, award, AllowDeath)?;
+
+			Self::deposit_event(Event::<T>::FaucetTopUpMoney(sender.clone()));
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn faucet(origin: OriginFor<T>, to: AccountOf<T>) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+			// let _ = ensure_none(origin)?;
+
+			if !<FaucetRecordMap<T>>::contains_key(&to) {
+				<FaucetRecordMap<T>>::insert(
+					&to,
+					FaucetRecord::<T> {
+						last_claim_time: BlockNumberOf::<T>::from(0u32),
+					}
+				);
+
+				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
+
+				let now = <frame_system::Pallet<T>>::block_number();
+
+				if now >= BlockNumberOf::<T>::from(28800u32) {
+					ensure!(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32) , Error::<T>::LessThan24Hours);
+				} else {
+					ensure!(faucet_record.last_claim_time <= BlockNumberOf::<T>::from(0u32) , Error::<T>::LessThan24Hours);
+				}
+				
+				let reward_pot = T::PalletId::get().into_account();
+
+				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
+
+				<FaucetRecordMap<T>>::insert(
+					&to,
+					FaucetRecord::<T> {
+						last_claim_time: now,
+					}
+				);
+			} else {
+				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
+
+				let now = <frame_system::Pallet<T>>::block_number();
+
+				if now >= BlockNumberOf::<T>::from(28800u32) {
+					ensure!(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32) , Error::<T>::LessThan24Hours);
+				} else {
+					ensure!(faucet_record.last_claim_time <= BlockNumberOf::<T>::from(0u32) , Error::<T>::LessThan24Hours);
+				}
+				
+				let reward_pot = T::PalletId::get().into_account();
+
+				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
+
+				<FaucetRecordMap<T>>::insert(
+					&to,
+					FaucetRecord::<T> {
+						last_claim_time: now,
+					}
+				);
+			}
+			Self::deposit_event(Event::<T>::DrawFaucetMoney());
+			Ok(())
+		}
+	
+		#[pallet::weight(50_000_000)]
+		pub fn add_power_test(origin: OriginFor<T>, peerid: u64, increment: u128) -> DispatchResult {
+			Self::add_power(peerid,increment);
+
+			Self::deposit_event(Event::<T>::DrawFaucetMoney());
+			Ok(())
+		}
+	
 	}
 }
 
@@ -595,6 +979,19 @@ impl<T: Config> Pallet<T> {
 		(peerid, segment_new_index)
 	}
 
+	pub fn get_peerid(aid: &<T as frame_system::Config>::AccountId) -> u64 {
+		if !<MinerItems<T>>::contains_key(&aid) {
+			Error::<T>::UnregisteredAccountId;
+		}
+		let peerid = MinerItems::<T>::get(&aid).unwrap().peerid;
+		peerid
+	}
+	pub fn get_segmentid(aid: &<T as frame_system::Config>::AccountId) -> u64 {
+		SegInfo::<T>::mutate(&aid, |s| (*s).segment_index += 1);
+		let segment_new_index = SegInfo::<T>::get(aid).segment_index;
+		segment_new_index
+	}
+
 	pub fn add_power(peerid: u64, increment: u128) {
 		//check exist
 		if !<WalletMiners<T>>::contains_key(peerid) {
@@ -602,8 +999,7 @@ impl<T: Config> Pallet<T> {
 		}
 
 		TotalPower::<T>::mutate(|s| *s += increment);
-		
-		StorageInfoValue::<T>::mutate(|s| (*s).used_storage += increment);
+		StorageInfoValue::<T>::mutate(|s| (*s).available_storage += increment);
 
 		MinerTable::<T>::mutate(peerid, |s_opt| {
 			let s = s_opt.as_mut().unwrap();
@@ -652,7 +1048,7 @@ impl<T: Config> Pallet<T> {
 		});
 
 		TotalPower::<T>::mutate(|s| *s -= increment);
-		StorageInfoValue::<T>::mutate(|s| (*s).used_storage -= increment);
+		StorageInfoValue::<T>::mutate(|s| (*s).available_storage -= increment);
 		let mut allminer = AllMiner::<T>::get();
 		let mut k = 0;
 		for i in allminer.clone().iter() {
@@ -678,17 +1074,24 @@ impl<T: Config> Pallet<T> {
 		if !<WalletMiners<T>>::contains_key(peerid) {
 			Error::<T>::UnregisteredAccountId;
 		}
-		TotalSpace::<T>::mutate(|s| *s += increment);
+
 		MinerDetails::<T>::mutate(peerid, |s_opt| {
 			let s = s_opt.as_mut().unwrap();
 			s.space += increment;
+		});
+
+		StorageInfoValue::<T>::mutate(|s| (*s).used_storage += increment);
+
+		MinerStatValue::<T>::mutate(|s_opt| {
+			let s = s_opt.as_mut().unwrap();
+			s.sum_files += 1;
 		});
 
 		let mut allminer = AllMiner::<T>::get();
 		let mut k = 0;
 		for i in allminer.clone().iter() {
 			if i.peerid == peerid {
-				let newminer = MinerInfo {
+ 				let newminer = MinerInfo {
 					peerid: i.peerid,
 					ip: i.ip,
 					port: i.port,
@@ -709,10 +1112,17 @@ impl<T: Config> Pallet<T> {
 		if !<WalletMiners<T>>::contains_key(peerid) {
 			Error::<T>::UnregisteredAccountId;
 		}
-		TotalSpace::<T>::mutate(|s| *s -= increment);
+
 		MinerDetails::<T>::mutate(peerid, |s_opt| {
 			let s = s_opt.as_mut().unwrap();
 			s.space -= increment;
+		});
+
+		StorageInfoValue::<T>::mutate(|s| (*s).used_storage -= increment);
+
+		MinerStatValue::<T>::mutate(|s_opt| {
+			let s = s_opt.as_mut().unwrap();
+			s.sum_files -= 1;
 		});
 
 		let mut allminer = AllMiner::<T>::get();
@@ -745,6 +1155,45 @@ impl<T: Config> Pallet<T> {
 		T::Currency::unreserve(&aid, mr.collaterals);
 		MinerItems::<T>::mutate(&aid, |s| s.as_mut().unwrap().collaterals -= money);
 		T::Currency::transfer(&aid, &acc, money, AllowDeath)?;
+
+		Ok(())
+	}
+
+	// #[pallet::weight(50_000_000)]
+	pub fn add_reward_order1(acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
+
+		let now = <frame_system::Pallet<T>>::block_number();
+		// With block timing, 180 days =5184000 blocks
+		let deadline = now + T::BlockNumber::from(5184000u32);
+
+		if !<CalculateRewardOrderMap<T>>::contains_key(&acc) {
+			let order: Vec<CalculateRewardOrder<T>> = vec![CalculateRewardOrder::<T>{
+				calculate_reward:calculate_reward,
+				start_t: now,
+				deadline: deadline,
+			}];
+
+			<CalculateRewardOrderMap<T>>::insert(
+				acc,
+				order,
+			);
+		} else {
+			let order1: CalculateRewardOrder<T> = CalculateRewardOrder::<T>{
+				calculate_reward:calculate_reward,
+				start_t: now,
+				deadline: deadline,
+			};
+
+			// Obtain user computing power order
+			let mut order_vec = CalculateRewardOrderMap::<T>::get(&acc);
+
+			order_vec.push(order1);
+
+			<CalculateRewardOrderMap<T>>::insert(
+				acc,
+				order_vec,
+			);
+		}
 
 		Ok(())
 	}

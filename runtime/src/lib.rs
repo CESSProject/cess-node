@@ -808,19 +808,6 @@ impl pallet_file_bank::Config for Runtime {
 	type WeightInfo = pallet_file_bank::weights::SubstrateWeight<Runtime>;
 }
 
-
-  parameter_types! {
-	pub const FBModuleId2: PalletId = PalletId(*b"mmreward");
-  }
-  
-  impl pallet_miners_reward::Config for Runtime {
-	type Event = Event;
-	type Currency = Balances;
-	type MyPalletId = FBModuleId2;
-	type MRScheduler = Scheduler;
-	type MRPalletsOrigin = OriginCaller;
-	type MRProposal = Call;
-}
 /*** End This Block ***/
 
 // /// Configure the pallet-template in pallets/template.
@@ -862,7 +849,6 @@ construct_runtime!(
 		FileBank: pallet_file_bank::{Pallet,Call, Storage, Event<T>},
 		BagsList: pallet_bags_list::{Pallet,Call, Storage, Event<T>},
 
-		MinersReward: pallet_miners_reward::{Pallet, Call, Storage, Event<T>},
 	}
 );
 

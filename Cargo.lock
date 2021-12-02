@@ -764,7 +764,6 @@ dependencies = [
  "pallet-grandpa",
  "pallet-im-online",
  "pallet-membership",
- "pallet-miners-reward",
  "pallet-offences",
  "pallet-randomness-collective-flip",
  "pallet-scheduler",
@@ -3999,23 +3998,6 @@ dependencies = [
  "log",
  "parity-scale-codec",
  "scale-info",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
-name = "pallet-miners-reward"
-version = "0.1.0"
-dependencies = [
- "frame-support",
- "frame-system",
- "pallet-balances",
- "pallet-sminer",
- "parity-scale-codec",
- "scale-info",
- "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",

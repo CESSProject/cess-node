@@ -314,12 +314,6 @@ default-features = false
 path = '../c-pallets/file-bank'
 version = '0.1.0'
 
-# local dependencies
-[dependencies.pallet-miners-reward]
-default-features = false
-path = '../c-pallets/miners-reward'
-version = '0.1.0'
-
 [features]
 default = ['std']
 runtime-benchmarks = [
