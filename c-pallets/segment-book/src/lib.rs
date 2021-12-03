@@ -619,9 +619,9 @@ pub mod pallet {
 				2u8 => {
 					let acc = pallet_sminer::Pallet::<T>::get_acc(peerid);
 					let segment_id = pallet_sminer::Pallet::<T>::get_segmentid(&acc);
-					ensure!(!<VerPoolC<T>>::contains_key(&sender, segment_id), Error::<T>::YetIntennt);
+					ensure!(!<VerPoolC<T>>::contains_key(&acc, segment_id), Error::<T>::YetIntennt);
 					<VerPoolC<T>>::insert(
-						&sender,
+						&acc,
 						segment_id,
 						ProofInfoVPC {
 							is_ready: false,

@@ -107,6 +107,8 @@ pub struct MinerStatInfo<T: pallet::Config> {
 	sum_files: u128, 
 }
 
+
+//----------------------------------------added by Waker-----------------
 /// The custom struct for storing info of storage CalculateRewardOrder.
 #[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -133,6 +135,7 @@ pub struct RewardClaim <T: pallet::Config>{
 pub struct FaucetRecord <T: pallet::Config>{
 	last_claim_time: BlockNumberOf<T>,
 }
+//----------------------------------------added by Waker-----------------
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -180,7 +183,7 @@ pub mod pallet {
 		UpdateAddressSucc(AccountOf<T>),
 
 		SetEtcdSucc(AccountOf<T>),
-		
+		//----------------------------------------added by Waker-----------------
 		/// An account Add files
 		Add(AccountOf<T>),
 		/// An account Deleted files
@@ -197,6 +200,7 @@ pub mod pallet {
 		DrawFaucetMoney(),
 		/// User recharges faucet
 		FaucetTopUpMoney(AccountOf<T>),
+		//----------------------------------------added by Waker-----------------
 	}
 
 	/// Error for the sminer pallet.
@@ -215,6 +219,7 @@ pub mod pallet {
 
 		NotOwner,
 
+		//----------------------------------------added by Waker-----------------
 		NotExisted,	
 
 		LackOfPermissions,
@@ -226,6 +231,7 @@ pub mod pallet {
 		ConversionError,
 
 		OffchainUnsignedTxError,
+		//----------------------------------------added by Waker-----------------
 	}
 
 	/// The hashmap for info of storage miners.
@@ -297,6 +303,7 @@ pub mod pallet {
 	#[pallet::getter(fn miner_info)]
 	pub(super) type AllMiner<T: Config> = StorageValue<_, Vec<MinerInfo>, ValueQuery>;
 
+	//----------------------------------------added by zhang-----------------
 	//Store all miner information
 	#[pallet::storage]
 	#[pallet::getter(fn miner_table)]
@@ -310,7 +317,9 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn miner_stat_value)]
 	pub(super) type MinerStatValue<T: Config> = StorageValue<_, MinerStatInfo<T>>;
+	//----------------------------------------added by zhang-----------------
 
+	//----------------------------------------added by Waker-----------------
 	/// The hashmap for info of storage miners.
 	#[pallet::storage]
 	#[pallet::getter(fn calculate_reward_order)]
@@ -325,6 +334,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn faucet_record)]
 	pub(super) type FaucetRecordMap<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, FaucetRecord<T>>;
+	//----------------------------------------added by Waker-----------------
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -381,6 +391,7 @@ pub mod pallet {
 			};
 			AllMiner::<T>::mutate(|s| (*s).push(add_minerinfo));
 
+			//----------------------------------------added by zhang-----------------
 			<MinerTable<T>>::insert(
 				peerid,
 				TableInfo::<T> {
@@ -408,20 +419,12 @@ pub mod pallet {
 			);
 
 			MinerStatValue::<T>::mutate(|s_opt| {
-				let mut msi = MinerStatInfo::<T> {
-					total_miners: 1u64,
-					active_miners: 1u64,
-					staking: staking_val.clone(),
-					miner_reward: BalanceOf::<T>::from(0 as u32),
-					sum_files: 0u128,
-				};
-				let s = s_opt.as_mut().unwrap_or_else(||{
-					&mut msi
-				});
+				let s = s_opt.as_mut().unwrap();
 				s.total_miners += 1;
 				s.active_miners += 1;
 				s.staking += staking_val.clone();
 			});
+			//----------------------------------------added by zhang-----------------
 
 			Self::deposit_event(Event::<T>::Registered(sender.clone(), staking_val.clone()));
 			Ok(())
@@ -465,6 +468,24 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Claimed(sender.clone(), deposit.clone()));
 			Ok(())
 		}
+
+		//----------------------------------------added by zhang-----------------
+		#[pallet::weight(50_000_000)]
+		pub fn initi(origin: OriginFor<T>) -> DispatchResult {
+			//sudo call
+			let sender = ensure_signed(origin)?;
+			let value = BalanceOf::<T>::from(0 as u32);
+			let mst = MinerStatInfo::<T> {
+				total_miners: 0u64,
+				active_miners: 0u64,
+				staking: value,
+				miner_reward: value,
+				sum_files: 0u128,
+			};
+			<MinerStatValue<T>>::put(mst);
+			Ok(())
+		}
+		//----------------------------------------added by zhang-----------------
 
 		#[pallet::weight(50_000_000)]
 		pub fn setaddress(origin: OriginFor<T>, address1: T::AccountId, address2: T::AccountId, address3: T::AccountId, address4: T::AccountId) -> DispatchResult {
@@ -962,6 +983,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::DrawFaucetMoney());
 			Ok(())
 		}
+		//----------------------------------------added by Waker-----------------
 	
 	}
 }
@@ -1001,6 +1023,7 @@ impl<T: Config> Pallet<T> {
 		TotalPower::<T>::mutate(|s| *s += increment);
 		StorageInfoValue::<T>::mutate(|s| (*s).available_storage += increment);
 
+		//----------------------------------------added by zhang-----------------
 		MinerTable::<T>::mutate(peerid, |s_opt| {
 			let s = s_opt.as_mut().unwrap();
 			s.total_storage += increment;
@@ -1010,6 +1033,7 @@ impl<T: Config> Pallet<T> {
 			let s = s_opt.as_mut().unwrap();
 			s.power += increment;
 		});
+		//----------------------------------------added by zhang-----------------
 
 		let mut allminer = AllMiner::<T>::get();
 		let mut k = 0;
@@ -1079,7 +1103,7 @@ impl<T: Config> Pallet<T> {
 			let s = s_opt.as_mut().unwrap();
 			s.space += increment;
 		});
-
+		TotalSpace::<T>::mutate(|s| *s += increment);
 		StorageInfoValue::<T>::mutate(|s| (*s).used_storage += increment);
 
 		MinerStatValue::<T>::mutate(|s_opt| {
@@ -1117,7 +1141,7 @@ impl<T: Config> Pallet<T> {
 			let s = s_opt.as_mut().unwrap();
 			s.space -= increment;
 		});
-
+		TotalSpace::<T>::mutate(|s| *s -= increment);
 		StorageInfoValue::<T>::mutate(|s| (*s).used_storage -= increment);
 
 		MinerStatValue::<T>::mutate(|s_opt| {
