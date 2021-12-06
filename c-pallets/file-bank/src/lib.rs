@@ -49,7 +49,7 @@ pub struct FileInfo<T: pallet::Config> {
 	//download fee
 	downloadfee: BalanceOf<T>,
 	//survival time
-	deadline: BlockNumberOf<T>,
+	deadline: u128,
 }
 
 #[frame_support::pallet]
@@ -118,9 +118,6 @@ pub mod pallet {
 		pub fn upload(origin: OriginFor<T>, filename:Vec<u8>, address:Vec<u8>, fileid: Vec<u8>, filehash: Vec<u8>, similarityhash: Vec<u8>, ispublic: u8, backups: u8, creator: Vec<u8>, filesize: u128, keywords: Vec<u8>, email: Vec<u8>, uploadfee:BalanceOf<T>, downloadfee:BalanceOf<T>, deadline: u128) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
-			let blocknumber = deadline / (6 as u128);
-			let now = <frame_system::Pallet<T>>::block_number();
-
 			let acc = T::FilbakPalletId::get().into_account();
 			T::Currency::transfer(&sender, &acc, uploadfee, AllowDeath)?;
 			let mut invoice: Vec<u8> = Vec::new();
@@ -150,7 +147,7 @@ pub mod pallet {
 					email,
 					uploadfee: uploadfee.clone(),
 					downloadfee: downloadfee.clone(),
-					deadline: now + (blocknumber as u32).into(),
+					deadline: deadline,
 				}
 			);
 			UserFileSize::<T>::mutate(sender.clone(), |s| *s += filesize);

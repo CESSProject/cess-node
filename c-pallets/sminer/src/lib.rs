@@ -147,8 +147,14 @@ pub mod pallet {
 	};
 	use frame_system::{ensure_signed, pallet_prelude::*};
 
-	const DEMOCRACY_ID: LockIdentifier = *b"mmsminer";
+//----------------------------------------added by Waker-----------------
+	const DEMOCRACY_IDA: LockIdentifier = *b"msminerA";
+	const DEMOCRACY_IDB: LockIdentifier = *b"msminerB";
+	const DEMOCRACY_IDC: LockIdentifier = *b"msminerC";
+	const DEMOCRACY_IDD: LockIdentifier = *b"msminerD";
+//----------------------------------------added by Waker-----------------
 
+	
 	#[pallet::config]
 	pub trait Config: pallet_timestamp::Config + frame_system::Config {
 		/// The overarching event type.
@@ -158,8 +164,9 @@ pub mod pallet {
 		/// The treasury's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-
-		type SScheduler: ScheduleNamed<Self::BlockNumber, Self::SProposal, Self::SPalletsOrigin>;
+//----------------------------------------added by Waker-----------------
+	type SScheduler: ScheduleNamed<Self::BlockNumber, Self::SProposal, Self::SPalletsOrigin>;
+//----------------------------------------added by Waker-----------------	
 		/// Overarching type of all pallets origins.
 		type SPalletsOrigin: From<system::RawOrigin<Self::AccountId>>;
 
@@ -201,6 +208,10 @@ pub mod pallet {
 		/// User recharges faucet
 		FaucetTopUpMoney(AccountOf<T>),
 		//----------------------------------------added by Waker-----------------
+
+		//----------------------------------------added by ytq-----------------
+		LessThan24Hours(BlockNumberOf<T>, BlockNumberOf<T>),
+		//----------------------------------------added by ytq-----------------
 	}
 
 	/// Error for the sminer pallet.
@@ -231,6 +242,8 @@ pub mod pallet {
 		ConversionError,
 
 		OffchainUnsignedTxError,
+
+		DivideByZero,
 		//----------------------------------------added by Waker-----------------
 	}
 
@@ -630,12 +643,13 @@ pub mod pallet {
 			Ok(())
 		}
 
+		//----------------------------------------added by Waker-----------------
 		#[pallet::weight(50_000_000)]
 		pub fn timing_task_storage_space(origin: OriginFor<T>, when: T::BlockNumber, cycle: T::BlockNumber, degree: u32) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
 			if T::SScheduler::schedule_named(
-				(DEMOCRACY_ID).encode(),
+				(DEMOCRACY_IDD).encode(),
 				DispatchTime::At(when),
 				Some(( cycle, degree)),
 				63,
@@ -682,10 +696,19 @@ pub mod pallet {
 		#[pallet::weight(50_000_000)]
 		pub fn timed_increase_rewards(origin: OriginFor<T>) -> DispatchResult {
 			let total_power = <TotalPower<T>>::get();
+			ensure!(total_power != 0, Error::<T>::DivideByZero);
 			for (peerid, detail) in <MinerDetails<T>>::iter() {
-				// Call::add_reward_order::<T> { acc: detail.address, calculate_reward: 750000000000000000*detail.power/total_power };
-				Self::add_reward_order1(detail.address,750000000000000000*detail.power/total_power);
+				Self::add_reward_order1(detail.address,750000000000000000*detail.power/total_power);	
 			}
+//----------------------------------------added by Waker-----------------
+			let reward3:BalanceOf<T> = 750000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?;
+
+			MinerStatValue::<T>::mutate(|s_opt| {
+				let s = s_opt.as_mut().unwrap();
+				s.miner_reward += reward3;
+			});
+//----------------------------------------added by Waker-----------------
+
 			Self::deposit_event(Event::<T>::TimedTask());
 			Ok(())
 		}
@@ -695,10 +718,10 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 
 			if T::SScheduler::schedule_named(
-				(DEMOCRACY_ID).encode(),
+				(DEMOCRACY_IDA).encode(),
 				DispatchTime::At(when),
 				Some(( cycle, degree)),
-				63,
+				60,
 				frame_system::RawOrigin::Root.into(),
 				Call::timed_increase_rewards{}.into(),
 			).is_err() {
@@ -708,47 +731,6 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Add(sender.clone()));
 			Ok(())
 		}
-		
-		// #[pallet::weight(50_000_000)]
-		// pub fn add_reward_order(origin: OriginFor<T>, acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
-		// 	let sender = ensure_signed(origin)?;
-
-		// 	let now = <frame_system::Pallet<T>>::block_number();
-		// 	// With block timing, 180 days =2,592,000 blocks
-		// 	let deadline = now + T::BlockNumber::from(2592000u32);
-
-		// 	if !<CalculateRewardOrderMap<T>>::contains_key(&acc) {
-		// 		let order: Vec<CalculateRewardOrder<T>> = vec![CalculateRewardOrder::<T>{
-		// 			calculate_reward:calculate_reward,
-		// 			start_t: now,
-		// 			deadline: deadline,
-		// 		}];
-
-		// 		<CalculateRewardOrderMap<T>>::insert(
-		// 			acc,
-		// 			order,
-		// 		);
-		// 	} else {
-		// 		let order1: CalculateRewardOrder<T> = CalculateRewardOrder::<T>{
-		// 			calculate_reward:calculate_reward,
-		// 			start_t: now,
-		// 			deadline: deadline,
-		// 		};
-
-		// 		// Obtain user computing power order
-		// 		let mut order_vec = CalculateRewardOrderMap::<T>::get(&acc);
-
-		// 		order_vec.push(order1);
-
-		// 		<CalculateRewardOrderMap<T>>::insert(
-		// 			acc,
-		// 			order_vec,
-		// 		);
-		// 	}
-
-		// 	Self::deposit_event(Event::<T>::Add(sender.clone()));
-		// 	Ok(())
-		// }
 
 		#[pallet::weight(50_000_000)]
 		pub fn del_reward_order(origin: OriginFor<T>,acc: AccountOf<T>, order_num: u128) -> DispatchResult {
@@ -821,12 +803,30 @@ pub mod pallet {
 					reward_claim.have_to_receive = reward_claim.have_to_receive + award;
 				});
 			}
-			// Self::deposit_event(Event::<T>::DrawMoney(sender.clone()));
 			Ok(())
 		}
 
 		#[pallet::weight(50_000_000)]
-		pub fn timed_task_receive_award(_origin: OriginFor<T>) -> DispatchResult {
+		pub fn timing_user_receive_award(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			if T::SScheduler::schedule_named(
+				(DEMOCRACY_IDC).encode(),
+				DispatchTime::At(when),
+				Some(( cycle, degree)),
+				63,
+				frame_system::RawOrigin::Root.into(),
+				Call::timed_user_receive_award1{}.into(),
+			).is_err() {
+				frame_support::print("LOGIC ERROR: timed_user_receive_award1/schedule_named failed");
+			}
+
+			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			Ok(())
+		}
+
+		#[pallet::weight(50_000_000)]
+		pub fn timed_task_award_table(_origin: OriginFor<T>) -> DispatchResult {
 			for (_acc, order_vec) in <CalculateRewardOrderMap<T>>::iter() {
 				let mut total:u128 = 0;
 
@@ -847,7 +847,14 @@ pub mod pallet {
 				let currently_available:BalanceOf<T> = reward1+avail;
 
 				let reward2:BalanceOf<T> = total.try_into().map_err(|_e| Error::<T>::ConversionError)?;
-				
+//----------------------------------------added by Waker-----------------
+				let peerid = MinerItems::<T>::get(&_acc).unwrap().peerid;
+
+				MinerTable::<T>::mutate(peerid, |s_opt| {
+					let s = s_opt.as_mut().unwrap();
+					s.mining_reward = reward2;
+				});
+//----------------------------------------added by Waker-----------------				
 				if !<RewardClaimMap<T>>::contains_key(&_acc) {
 					<RewardClaimMap<T>>::insert(
 						_acc, 
@@ -875,16 +882,16 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(50_000_000)]
-		pub fn timing_task_award(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
+		pub fn timing_task_award_table(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
 			if T::SScheduler::schedule_named(
-				(DEMOCRACY_ID).encode(),
+				(DEMOCRACY_IDB).encode(),
 				DispatchTime::At(when),
 				Some(( cycle, degree)),
-				63,
+				61,
 				frame_system::RawOrigin::Root.into(),
-				Call::timed_task_receive_award{}.into(),
+				Call::timed_task_award_table{}.into(),
 			).is_err() {
 				frame_support::print("LOGIC ERROR: timed_task_receive_award/schedule_named failed");
 			}
@@ -933,12 +940,6 @@ pub mod pallet {
 				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
 
 				let now = <frame_system::Pallet<T>>::block_number();
-
-				if now >= BlockNumberOf::<T>::from(28800u32) {
-					ensure!(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32) , Error::<T>::LessThan24Hours);
-				} else {
-					ensure!(faucet_record.last_claim_time <= BlockNumberOf::<T>::from(0u32) , Error::<T>::LessThan24Hours);
-				}
 				
 				let reward_pot = T::PalletId::get().into_account();
 
@@ -954,13 +955,21 @@ pub mod pallet {
 				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
 
 				let now = <frame_system::Pallet<T>>::block_number();
-
+				let mut flag: bool = true;
+				//--------------------------------add ytq--------------------------------------
 				if now >= BlockNumberOf::<T>::from(28800u32) {
-					ensure!(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32) , Error::<T>::LessThan24Hours);
+					if !(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32)) {
+						Self::deposit_event(Event::<T>::LessThan24Hours(faucet_record.last_claim_time, now));
+						flag = false;
+					}
 				} else {
-					ensure!(faucet_record.last_claim_time <= BlockNumberOf::<T>::from(0u32) , Error::<T>::LessThan24Hours);
+					if !(faucet_record.last_claim_time <= BlockNumberOf::<T>::from(0u32)) {
+						Self::deposit_event(Event::<T>::LessThan24Hours(faucet_record.last_claim_time, now));
+						flag = false;
+					}
 				}
-				
+				ensure!(flag , Error::<T>::LessThan24Hours);
+				//--------------------------------add ytq--------------------------------------
 				let reward_pot = T::PalletId::get().into_account();
 
 				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
@@ -1184,6 +1193,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	// #[pallet::weight(50_000_000)]
+	//----------------------------------------added by Waker-----------------
 	pub fn add_reward_order1(acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
 
 		let now = <frame_system::Pallet<T>>::block_number();

@@ -773,9 +773,9 @@ impl pallet_sudo::Config for Runtime {
 /*** Add This Block ***/
 parameter_types! {
 	pub const RewardPalletId: PalletId = PalletId(*b"rewardpt");
-}
-
-impl pallet_sminer::Config for Runtime {
+  }
+  
+  impl pallet_sminer::Config for Runtime {
 	type Currency = Balances;
 	// The ubiquitous event type.
 	type Event = Event;
@@ -783,7 +783,7 @@ impl pallet_sminer::Config for Runtime {
 	type SScheduler = Scheduler;
 	type SPalletsOrigin = OriginCaller;
 	type SProposal = Call;
-}
+  }
 parameter_types! {
 	pub const SegbkPalletId: PalletId = PalletId(*b"rewardpt");
 }
