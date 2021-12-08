@@ -174,6 +174,7 @@ pub mod pallet {
 		pub fn buyfile(origin: OriginFor<T>,fileid: Vec<u8>, address: Vec<u8>) -> DispatchResult{
 			let sender = ensure_signed(origin)?;
 
+			ensure!((<File<T>>::contains_key(fileid.clone())), Error::<T>::FileNonExistent);
 			let group_id = <File<T>>::get(fileid.clone()).unwrap();
 
 			let mut invoice: Vec<u8> = Vec::new();
@@ -183,10 +184,7 @@ pub mod pallet {
 			for i in &address {
 				invoice.push(*i);
 			}
-			ensure!((<File<T>>::contains_key(fileid.clone())), Error::<T>::FileNonExistent);
-
-			
-			
+				
 			if <Invoice<T>>::contains_key(fileid.clone()) {
 				Self::deposit_event(Event::<T>::Purchased(sender.clone(), fileid.clone()));
 			} else {

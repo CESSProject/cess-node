@@ -966,7 +966,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(50_000_000)]
-		pub fn verify_in_vpc(origin: OriginFor<T>, peer_id: u64, segment_id: u64, result: bool) -> DispatchResult {
+		pub fn verify_in_vpc(origin: OriginFor<T>, peer_id: u64, segment_id: u64, uncid: Vec<Vec<u8>>, result: bool) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 			let sender = pallet_sminer::Pallet::<T>::get_acc(peer_id);
 			//-------------------here needs a check func.
@@ -1056,18 +1056,47 @@ pub mod pallet {
 						v
 					);
 				}
-				
-				<MinerHoldSlice<T>>::mutate(&sender, |s|{
-					//let s = s_opt.as_mut().unwrap();
+
+				if <MinerHoldSlice<T>>::contains_key(&sender){
 					let mut k = 0;
-					for i in s.iter(){
+					let mut y = 0;
+					let mut accfiles = <MinerHoldSlice<T>>::get(&sender);
+					for i in accfiles.iter() {
 						if i.segment_id == segment_id {
 							break;
 						}
 						k += 1;
 					}
-					s.remove(k);
-				});
+					let file = accfiles.get(k).unwrap();
+					let mut slice = file.uncid.to_vec();
+					for i in slice.clone().iter() {
+						for j in uncid.iter() {
+							if *i == *j {
+								slice.remove(y);
+								y -= 1;
+								break;
+							}
+						}	
+						y += 1;
+					}
+					
+					if slice.len() > 0{
+						let value = FileSilceInfo{
+							peer_id: file.peer_id,
+							segment_id: file.segment_id,
+							uncid: slice,
+							rand: file.rand,
+							hash: file.hash.to_vec(),
+							shardhash: file.shardhash.to_vec(),
+						};
+						accfiles.remove(k);
+						accfiles.push(value);
+					} else {
+						accfiles.remove(k);
+					}	
+				}
+				
+				
 				
 			}
 			<VerPoolC<T>>::remove(&sender, segment_id);

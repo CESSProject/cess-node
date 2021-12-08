@@ -108,7 +108,6 @@ pub struct MinerStatInfo<T: pallet::Config> {
 }
 
 
-//----------------------------------------added by Waker-----------------
 /// The custom struct for storing info of storage CalculateRewardOrder.
 #[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -135,7 +134,6 @@ pub struct RewardClaim <T: pallet::Config>{
 pub struct FaucetRecord <T: pallet::Config>{
 	last_claim_time: BlockNumberOf<T>,
 }
-//----------------------------------------added by Waker-----------------
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -147,12 +145,10 @@ pub mod pallet {
 	};
 	use frame_system::{ensure_signed, pallet_prelude::*};
 
-//----------------------------------------added by Waker-----------------
 	const DEMOCRACY_IDA: LockIdentifier = *b"msminerA";
 	const DEMOCRACY_IDB: LockIdentifier = *b"msminerB";
 	const DEMOCRACY_IDC: LockIdentifier = *b"msminerC";
 	const DEMOCRACY_IDD: LockIdentifier = *b"msminerD";
-//----------------------------------------added by Waker-----------------
 
 	
 	#[pallet::config]
@@ -164,9 +160,7 @@ pub mod pallet {
 		/// The treasury's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-//----------------------------------------added by Waker-----------------
 	type SScheduler: ScheduleNamed<Self::BlockNumber, Self::SProposal, Self::SPalletsOrigin>;
-//----------------------------------------added by Waker-----------------	
 		/// Overarching type of all pallets origins.
 		type SPalletsOrigin: From<system::RawOrigin<Self::AccountId>>;
 
@@ -190,7 +184,7 @@ pub mod pallet {
 		UpdateAddressSucc(AccountOf<T>),
 
 		SetEtcdSucc(AccountOf<T>),
-		//----------------------------------------added by Waker-----------------
+
 		/// An account Add files
 		Add(AccountOf<T>),
 		/// An account Deleted files
@@ -207,11 +201,8 @@ pub mod pallet {
 		DrawFaucetMoney(),
 		/// User recharges faucet
 		FaucetTopUpMoney(AccountOf<T>),
-		//----------------------------------------added by Waker-----------------
 
-		//----------------------------------------added by ytq-----------------
 		LessThan24Hours(BlockNumberOf<T>, BlockNumberOf<T>),
-		//----------------------------------------added by ytq-----------------
 	}
 
 	/// Error for the sminer pallet.
@@ -230,7 +221,6 @@ pub mod pallet {
 
 		NotOwner,
 
-		//----------------------------------------added by Waker-----------------
 		NotExisted,	
 
 		LackOfPermissions,
@@ -244,7 +234,6 @@ pub mod pallet {
 		OffchainUnsignedTxError,
 
 		DivideByZero,
-		//----------------------------------------added by Waker-----------------
 	}
 
 	/// The hashmap for info of storage miners.
@@ -316,7 +305,6 @@ pub mod pallet {
 	#[pallet::getter(fn miner_info)]
 	pub(super) type AllMiner<T: Config> = StorageValue<_, Vec<MinerInfo>, ValueQuery>;
 
-	//----------------------------------------added by zhang-----------------
 	//Store all miner information
 	#[pallet::storage]
 	#[pallet::getter(fn miner_table)]
@@ -330,9 +318,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn miner_stat_value)]
 	pub(super) type MinerStatValue<T: Config> = StorageValue<_, MinerStatInfo<T>>;
-	//----------------------------------------added by zhang-----------------
 
-	//----------------------------------------added by Waker-----------------
 	/// The hashmap for info of storage miners.
 	#[pallet::storage]
 	#[pallet::getter(fn calculate_reward_order)]
@@ -347,7 +333,6 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn faucet_record)]
 	pub(super) type FaucetRecordMap<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, FaucetRecord<T>>;
-	//----------------------------------------added by Waker-----------------
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -404,7 +389,6 @@ pub mod pallet {
 			};
 			AllMiner::<T>::mutate(|s| (*s).push(add_minerinfo));
 
-			//----------------------------------------added by zhang-----------------
 			<MinerTable<T>>::insert(
 				peerid,
 				TableInfo::<T> {
@@ -437,7 +421,6 @@ pub mod pallet {
 				s.active_miners += 1;
 				s.staking += staking_val.clone();
 			});
-			//----------------------------------------added by zhang-----------------
 
 			Self::deposit_event(Event::<T>::Registered(sender.clone(), staking_val.clone()));
 			Ok(())
@@ -482,7 +465,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		//----------------------------------------added by zhang-----------------
 		#[pallet::weight(50_000_000)]
 		pub fn initi(origin: OriginFor<T>) -> DispatchResult {
 			//sudo call
@@ -498,7 +480,6 @@ pub mod pallet {
 			<MinerStatValue<T>>::put(mst);
 			Ok(())
 		}
-		//----------------------------------------added by zhang-----------------
 
 		#[pallet::weight(50_000_000)]
 		pub fn setaddress(origin: OriginFor<T>, address1: T::AccountId, address2: T::AccountId, address3: T::AccountId, address4: T::AccountId) -> DispatchResult {
@@ -643,7 +624,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		//----------------------------------------added by Waker-----------------
 		#[pallet::weight(50_000_000)]
 		pub fn timing_task_storage_space(origin: OriginFor<T>, when: T::BlockNumber, cycle: T::BlockNumber, degree: u32) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
@@ -668,7 +648,6 @@ pub mod pallet {
 					
 			let now = pallet_timestamp::Pallet::<T>::get();
 
-			let storage_info = StorageInfoValue::<T>::get();
 			let mut storage_info_vec = StorageInfoVec::<T>::get();
 
 			let mut info1: Vec<StorageInfo> = Vec::new();
@@ -678,8 +657,8 @@ pub mod pallet {
 				let tmp = TryInto::<u128>::try_into(now).ok().unwrap() - 86400000*(30-i-1);
 
 				let value = StorageInfo{
-					used_storage: storage_info.used_storage,
-					available_storage: storage_info.available_storage,
+					used_storage: 0,
+					available_storage: 0,
 					time: tmp,
 				};
 				info1.push(value);
@@ -700,14 +679,12 @@ pub mod pallet {
 			for (peerid, detail) in <MinerDetails<T>>::iter() {
 				Self::add_reward_order1(detail.address,750000000000000000*detail.power/total_power);	
 			}
-//----------------------------------------added by Waker-----------------
 			let reward3:BalanceOf<T> = 750000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?;
 
 			MinerStatValue::<T>::mutate(|s_opt| {
 				let s = s_opt.as_mut().unwrap();
 				s.miner_reward += reward3;
 			});
-//----------------------------------------added by Waker-----------------
 
 			Self::deposit_event(Event::<T>::TimedTask());
 			Ok(())
@@ -837,8 +814,10 @@ pub mod pallet {
 					if i.deadline > now {
 						total += i.calculate_reward;
 						let tmp = TryInto::<u128>::try_into(now-i.start_t).ok().unwrap();
-						let day:u128 = tmp/28800+1;
-						avail += (i.calculate_reward*8/10/(180*day)).try_into().map_err(|_e| Error::<T>::ConversionError)?;
+						// let day:u128 = tmp/28800+1;
+						// test 5 minutes
+						let day:u128 = tmp/100+1;
+						avail += (i.calculate_reward*8/10/180*day).try_into().map_err(|_e| Error::<T>::ConversionError)?;
 					} else {
 						// Call::del_order(_acc,i);
 					}
@@ -847,17 +826,16 @@ pub mod pallet {
 				let currently_available:BalanceOf<T> = reward1+avail;
 
 				let reward2:BalanceOf<T> = total.try_into().map_err(|_e| Error::<T>::ConversionError)?;
-//----------------------------------------added by Waker-----------------
+
 				let peerid = MinerItems::<T>::get(&_acc).unwrap().peerid;
 
 				MinerTable::<T>::mutate(peerid, |s_opt| {
 					let s = s_opt.as_mut().unwrap();
 					s.mining_reward = reward2;
-				});
-//----------------------------------------added by Waker-----------------				
+				});	
 				if !<RewardClaimMap<T>>::contains_key(&_acc) {
 					<RewardClaimMap<T>>::insert(
-						_acc, 
+						&_acc, 
 						RewardClaim::<T> {
 							total_reward: reward2,
 							total_rewards_currently_available: currently_available,
@@ -866,13 +844,30 @@ pub mod pallet {
 							total_not_receive: reward2,
 						}
 					);
+
+					let peerid = MinerItems::<T>::get(&_acc).unwrap().peerid;
+					MinerDetails::<T>::mutate(peerid, |miner_detail_opt| {
+						let miner_detail = miner_detail_opt.as_mut().unwrap();
+						miner_detail.total_reward = reward2;
+						miner_detail.total_rewards_currently_available = currently_available;
+						miner_detail.totald_not_receive = reward2;
+					});
 				} else {
-					RewardClaimMap::<T>::mutate(_acc, |reward_claim_opt| {
+					RewardClaimMap::<T>::mutate(&_acc, |reward_claim_opt| {
 						let reward_claim = reward_claim_opt.as_mut().unwrap();
 						reward_claim.total_reward = reward2;
 						reward_claim.total_rewards_currently_available = currently_available;
 						reward_claim.current_availability = currently_available - reward_claim.have_to_receive;
 						reward_claim.total_not_receive = reward2 - reward_claim.have_to_receive;
+					});
+
+					let peerid = MinerItems::<T>::get(&_acc).unwrap().peerid;
+					MinerDetails::<T>::mutate(peerid, |miner_detail_opt| {
+						let miner_detail = miner_detail_opt.as_mut().unwrap();
+						miner_detail.total_reward = reward2;
+						miner_detail.total_rewards_currently_available = currently_available;
+						let total_not_receive = RewardClaimMap::<T>::get(&_acc).unwrap().total_not_receive;
+						miner_detail.totald_not_receive = total_not_receive;
 					});
 				}
 			}
@@ -956,7 +951,7 @@ pub mod pallet {
 
 				let now = <frame_system::Pallet<T>>::block_number();
 				let mut flag: bool = true;
-				//--------------------------------add ytq--------------------------------------
+			
 				if now >= BlockNumberOf::<T>::from(28800u32) {
 					if !(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32)) {
 						Self::deposit_event(Event::<T>::LessThan24Hours(faucet_record.last_claim_time, now));
@@ -969,7 +964,7 @@ pub mod pallet {
 					}
 				}
 				ensure!(flag , Error::<T>::LessThan24Hours);
-				//--------------------------------add ytq--------------------------------------
+		
 				let reward_pot = T::PalletId::get().into_account();
 
 				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
@@ -992,7 +987,6 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::DrawFaucetMoney());
 			Ok(())
 		}
-		//----------------------------------------added by Waker-----------------
 	
 	}
 }
@@ -1032,7 +1026,6 @@ impl<T: Config> Pallet<T> {
 		TotalPower::<T>::mutate(|s| *s += increment);
 		StorageInfoValue::<T>::mutate(|s| (*s).available_storage += increment);
 
-		//----------------------------------------added by zhang-----------------
 		MinerTable::<T>::mutate(peerid, |s_opt| {
 			let s = s_opt.as_mut().unwrap();
 			s.total_storage += increment;
@@ -1042,7 +1035,6 @@ impl<T: Config> Pallet<T> {
 			let s = s_opt.as_mut().unwrap();
 			s.power += increment;
 		});
-		//----------------------------------------added by zhang-----------------
 
 		let mut allminer = AllMiner::<T>::get();
 		let mut k = 0;
@@ -1193,12 +1185,13 @@ impl<T: Config> Pallet<T> {
 	}
 
 	// #[pallet::weight(50_000_000)]
-	//----------------------------------------added by Waker-----------------
 	pub fn add_reward_order1(acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
 
 		let now = <frame_system::Pallet<T>>::block_number();
 		// With block timing, 180 days =5184000 blocks
-		let deadline = now + T::BlockNumber::from(5184000u32);
+		// let deadline = now + T::BlockNumber::from(5184000u32);
+		// test 5 minutes
+		let deadline = now + T::BlockNumber::from(18000u32);
 
 		if !<CalculateRewardOrderMap<T>>::contains_key(&acc) {
 			let order: Vec<CalculateRewardOrder<T>> = vec![CalculateRewardOrder::<T>{
