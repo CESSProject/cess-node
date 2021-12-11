@@ -84,17 +84,7 @@ Install [Docker](https://docs.docker.com/get-docker/) first, and run the followi
 
 ```
 docker pull cesstech/cess-hacknet:v0.0.1
-docker run --network host cesstech/cess-hacknet:v0.0.1 ./CESS-v0.0.1/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
-```
-
-## Run Tests
-
-
-CESS has Rust unit tests, and can be run locally.
-
-```
-# Run all the Rust unit tests
-cargo test --release
+docker run --network host cesstech/cess-hacknet:v0.0.1 ./cess-node/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
 ```
 
 ## Module Documentation
