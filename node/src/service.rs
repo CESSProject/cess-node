@@ -231,7 +231,7 @@ pub fn new_full(
 		mut keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (rpc_extensions_builder, import_setup, rpc_setup, mut telemetry),
+		other: (rpc_extensions_builder, import_setup, _rpc_setup, mut telemetry),
 	} = new_partial(&config)?;
 
 	if let Some(url) = &config.keystore_remote {
@@ -281,16 +281,16 @@ pub fn new_full(
 
 
 
-	let justification_import = grandpa_block_import.clone();
+	let _justification_import = grandpa_block_import.clone();
 
-	let (block_import, babe_link) = sc_consensus_babe::block_import(
+	let (_block_import, _babe_link) = sc_consensus_babe::block_import(
 		sc_consensus_babe::Config::get_or_compute(&*client)?,
 		grandpa_block_import,
 		client.clone(),
 	)?;
 
 	let shared_authority_set = grandpa_link.shared_authority_set().clone();
-	let finality_proof_provider = grandpa::FinalityProofProvider::new_for_service(
+	let _finality_proof_provider = grandpa::FinalityProofProvider::new_for_service(
 		backend.clone(),
 		Some(shared_authority_set.clone()),
 	);

@@ -18,22 +18,25 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::traits::{Get, Currency, OnUnbalanced, ReservableCurrency, LockIdentifier, schedule::{Named as ScheduleNamed, DispatchTime}, ExistenceRequirement::AllowDeath};
+use frame_support::traits::{Get, Currency, ReservableCurrency, LockIdentifier, schedule::{Named as ScheduleNamed, DispatchTime}, ExistenceRequirement::AllowDeath};
+mod benchmarking;
+pub mod weights;
 pub use pallet::*;
 use sp_runtime::{
 	RuntimeDebug,
-	traits::{AccountIdConversion, StaticLookup, Zero},
+	traits::{AccountIdConversion, StaticLookup},
 };
 use sp_std::prelude::*;
 use codec::{Encode, Decode};
 use scale_info::TypeInfo;
 use sp_std::convert::TryInto;
 use frame_system::{self as system};
-use frame_support::{dispatch::{Dispatchable, DispatchResult}, transactional, PalletId};
+use frame_support::{dispatch::{Dispatchable, DispatchResult}, PalletId};
+pub use weights::WeightInfo;
 type AccountOf<T> = <T as frame_system::Config>::AccountId;
 type BalanceOf<T> = <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
-
+/// The custom struct for storing info of storage MinerInfo.
 #[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 pub struct MinerInfo {
 	peerid: u64,
@@ -56,20 +59,18 @@ pub struct Mr<T: pallet::Config> {
 	earnings: BalanceOf<T>,
 	locked: BalanceOf<T>,
 }
-
 /// The custom struct for storing index of segment, miner's current power and space.
 #[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 pub struct SegmentInfo {
 	segment_index: u64,
 }
-
+/// The custom struct for storing info of storage StorageInfo.
 #[derive(PartialEq, Eq, Default, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 pub struct StorageInfo {
 	used_storage: u128,
 	available_storage: u128,
 	time: u128,
 }
-
 /// The custom struct for miner table of block explorer.
 #[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -81,7 +82,6 @@ pub struct TableInfo<T: pallet::Config> {
 	average_daily_data_traffic_out: u64,
 	mining_reward: BalanceOf<T>,
 }
-
 /// The custom struct for miner detail of block explorer.
 #[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -95,7 +95,6 @@ pub struct MinerDetailInfo<T: pallet::Config> {
 	totald_not_receive: BalanceOf<T>,
 	collaterals: BalanceOf<T>,
 }
-
 /// The custom struct for miner detail of block explorer.
 #[derive(PartialEq, Eq, Encode, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -106,8 +105,6 @@ pub struct MinerStatInfo<T: pallet::Config> {
 	miner_reward: BalanceOf<T>,
 	sum_files: u128, 
 }
-
-
 /// The custom struct for storing info of storage CalculateRewardOrder.
 #[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -116,7 +113,6 @@ pub struct CalculateRewardOrder <T: pallet::Config>{
 	start_t: BlockNumberOf<T>,
 	deadline: BlockNumberOf<T>,
 }
-
 /// The custom struct for storing info of storage RewardClaim.
 #[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -127,7 +123,6 @@ pub struct RewardClaim <T: pallet::Config>{
 	current_availability: BalanceOf<T>,
 	total_not_receive: BalanceOf<T>,
 }
-
 /// The custom struct for storing info of storage FaucetRecord.
 #[derive(PartialEq, Eq, Encode, Default, Decode, Clone, RuntimeDebug, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -141,15 +136,14 @@ pub mod pallet {
 	use frame_support::{
 		ensure,
 		pallet_prelude::*,
-		traits::{EnsureOrigin, Get},
+		traits::Get,
 	};
-	use frame_system::{ensure_signed, pallet_prelude::*};
+	use frame_system::{ensure_root, ensure_signed, pallet_prelude::*};
 
 	const DEMOCRACY_IDA: LockIdentifier = *b"msminerA";
 	const DEMOCRACY_IDB: LockIdentifier = *b"msminerB";
 	const DEMOCRACY_IDC: LockIdentifier = *b"msminerC";
 	const DEMOCRACY_IDD: LockIdentifier = *b"msminerD";
-
 	
 	#[pallet::config]
 	pub trait Config: pallet_timestamp::Config + frame_system::Config {
@@ -160,11 +154,15 @@ pub mod pallet {
 		/// The treasury's pallet id, used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-	type SScheduler: ScheduleNamed<Self::BlockNumber, Self::SProposal, Self::SPalletsOrigin>;
+		/// The Scheduler.
+		type SScheduler: ScheduleNamed<Self::BlockNumber, Self::SProposal, Self::SPalletsOrigin>;
 		/// Overarching type of all pallets origins.
 		type SPalletsOrigin: From<system::RawOrigin<Self::AccountId>>;
-
+		/// The SProposal.
 		type SProposal: Parameter + Dispatchable<Origin=Self::Origin> + From<Call<Self>>;
+		/// The WeightInfo.
+		type WeightInfo: WeightInfo;
+
 	}
 
 	#[pallet::event]
@@ -176,15 +174,14 @@ pub mod pallet {
 		Redeemed(AccountOf<T>, BalanceOf<T>),
 		/// An account was claimed.
 		Claimed(AccountOf<T>, BalanceOf<T>),
-
+		/// Storage space is triggered periodically.
 		TimingStorageSpace(),
 		/// Adding a Scheduled Task.
 		AddScheduledTask(AccountOf<T>),
-
+		/// Updated address successfully.
 		UpdateAddressSucc(AccountOf<T>),
-
+		/// Set Etcd successfully.
 		SetEtcdSucc(AccountOf<T>),
-
 		/// An account Add files
 		Add(AccountOf<T>),
 		/// An account Deleted files
@@ -201,7 +198,7 @@ pub mod pallet {
 		DrawFaucetMoney(),
 		/// User recharges faucet
 		FaucetTopUpMoney(AccountOf<T>),
-
+		/// Prompt time
 		LessThan24Hours(BlockNumberOf<T>, BlockNumberOf<T>),
 	}
 
@@ -218,21 +215,19 @@ pub mod pallet {
 		EarningsIsEmpty,
 		/// An operation would lead to an overflow.
 		Overflow,
-
+		/// No owner.
 		NotOwner,
-
+		/// User does not exist.
 		NotExisted,	
-
+		/// Lack of permissions.
 		LackOfPermissions,
-
+		/// Beyond the requirements.
 		BeyondClaim,
-
+		/// The duration is less than 24 hours.
 		LessThan24Hours,
-
+		/// Numerical conversion error.
 		ConversionError,
-
-		OffchainUnsignedTxError,
-
+		/// You can't divide by zero
 		DivideByZero,
 	}
 
@@ -244,34 +239,39 @@ pub mod pallet {
 	/// The hashmap for checking registered or not.
 	#[pallet::storage]
 	#[pallet::getter(fn wallet_miners)]
-	pub(super) type WalletMiners<T: Config> =
-		StorageMap<_, Twox64Concat, u64, i8, ValueQuery>;
+	pub(super) type WalletMiners<T: Config> = StorageMap<_, Twox64Concat, u64, i8, ValueQuery>;
 
 	/// The hashmap for index of storage miners, it's unique to whole system.
 	#[pallet::storage]
 	#[pallet::getter(fn peer_index)]
 	pub(super) type PeerIndex<T: Config> = StorageValue<_, u64, ValueQuery>;
-
+	
+	/// Data structures that control permissions.
 	#[pallet::storage]
 	#[pallet::getter(fn control)]
 	pub(super) type Control<T: Config> = StorageValue<_, u8, ValueQuery>;
 
+	/// Etcd registers the owner's data structure.
 	#[pallet::storage]
 	#[pallet::getter(fn etcd_register_owner)]
 	pub(super) type EtcdRegisterOwner<T: Config> = StorageValue<_, Vec<T::AccountId>, ValueQuery>;
 
+	/// Data structure of the Etcd owner.
 	#[pallet::storage]
 	#[pallet::getter(fn etcd_owner)]
 	pub(super) type EtcdOwner<T: Config> = StorageValue<_, T::AccountId, ValueQuery>;
 
+	/// Data structure of the Etcd register.
 	#[pallet::storage]
 	#[pallet::getter(fn etcd_register)]
 	pub(super) type EtcdRegister<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
 
+	/// Data structure of the Etcd token.
 	#[pallet::storage]
 	#[pallet::getter(fn etcd_token)]
 	pub(super) type EtcdToken<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
 
+	/// Data structure of the Service port.
 	#[pallet::storage]
 	#[pallet::getter(fn service_port)]
 	pub(super) type ServicePort<T: Config> = StorageValue<_, Vec<u8>, ValueQuery>;
@@ -291,6 +291,7 @@ pub mod pallet {
 	#[pallet::getter(fn seg_info)]
 	pub(super) type SegInfo<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, SegmentInfo, ValueQuery>;
 
+	/// A data structure that stores information
 	#[pallet::storage]
 	#[pallet::getter(fn storage_info_value)]
 	pub(super) type StorageInfoValue<T: Config> = StorageValue<_, StorageInfo, ValueQuery>;
@@ -300,21 +301,22 @@ pub mod pallet {
 	#[pallet::getter(fn storage_info_vec)]
 	pub(super) type StorageInfoVec<T: Config> = StorageValue<_, Vec<StorageInfo>, ValueQuery>;
 
-	//Store all miner information
+	/// Store all miner information
 	#[pallet::storage]
 	#[pallet::getter(fn miner_info)]
 	pub(super) type AllMiner<T: Config> = StorageValue<_, Vec<MinerInfo>, ValueQuery>;
 
-	//Store all miner information
+	/// Store all miner table information 
 	#[pallet::storage]
 	#[pallet::getter(fn miner_table)]
 	pub(super) type MinerTable<T: Config> = StorageMap<_, Twox64Concat, u64, TableInfo<T>>;
 
-	//Store all miner information
+	/// Store all miner details information 
 	#[pallet::storage]
 	#[pallet::getter(fn miner_details)]
 	pub(super) type MinerDetails<T: Config> = StorageMap<_, Twox64Concat, u64, MinerDetailInfo<T>>;
 
+	/// Store all miner stat information 
 	#[pallet::storage]
 	#[pallet::getter(fn miner_stat_value)]
 	pub(super) type MinerStatValue<T: Config> = StorageValue<_, MinerStatInfo<T>>;
@@ -347,8 +349,10 @@ pub mod pallet {
 		/// Parameters:
 		/// - `beneficiary`: The beneficiary related to signer account.
 		/// - `ip`: The registered IP of storage miner.
+		/// - `port`: The number of staking.
+		/// - `fileport`: The number of staking.
 		/// - `staking_val`: The number of staking.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::regnstk())]
 		pub fn regnstk(origin: OriginFor<T>, beneficiary: <T::Lookup as StaticLookup>::Source, ip: u32, port: u32, fileport: u32,  #[pallet::compact] staking_val: BalanceOf<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
@@ -425,8 +429,10 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Registered(sender.clone(), staking_val.clone()));
 			Ok(())
 		}
-		
-		#[pallet::weight(50_000_000)]
+		/// Redeem for storage miner.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::redeem())]
 		pub fn redeem(origin: OriginFor<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let peerid = MinerItems::<T>::get(&sender).unwrap().peerid;
@@ -450,8 +456,10 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Redeemed(sender.clone(), deposit.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Storage miner gets mi.earnings bonus.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::claim())]
 		pub fn claim(origin: OriginFor<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let peerid = MinerItems::<T>::get(&sender).unwrap().peerid;
@@ -464,11 +472,13 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::Claimed(sender.clone(), deposit.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Miner information initialization.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::initi())]
 		pub fn initi(origin: OriginFor<T>) -> DispatchResult {
 			//sudo call
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 			let value = BalanceOf::<T>::from(0 as u32);
 			let mst = MinerStatInfo::<T> {
 				total_miners: 0u64,
@@ -480,10 +490,18 @@ pub mod pallet {
 			<MinerStatValue<T>>::put(mst);
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Set the Etcd registration address.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `address1`: The account address 1.
+		/// - `address2`: The account address 2.
+		/// - `address3`: The account address 3.
+		/// - `address4`: The account address 4.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::setaddress())]
 		pub fn setaddress(origin: OriginFor<T>, address1: T::AccountId, address2: T::AccountId, address3: T::AccountId, address4: T::AccountId) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_signed(origin)?;
 			let v = <Control<T>>::get();
 			if v == 0 {
 				EtcdRegisterOwner::<T>::mutate(|s|{
@@ -500,8 +518,13 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Update the Etcd registration address.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `newaddress`: Updated account address.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::updateaddress())]
 		pub fn updateaddress(origin: OriginFor<T>, newaddress: T::AccountId) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let mut flag: bool = false;
@@ -529,8 +552,13 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Set ETCD parameters.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `ip`: Server IP Address.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::setetcd())]
 		pub fn setetcd(origin: OriginFor<T>, ip: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let mut flag: bool = false;
@@ -550,8 +578,13 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Set ETCD token.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `token`: Etcd Token.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::setetcdtoken())]
 		pub fn setetcdtoken(origin: OriginFor<T>, token: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let mut flag: bool = false;
@@ -567,9 +600,13 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-
-
-		#[pallet::weight(50_000_000)]
+		/// Set service port.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `serviceport`: service port.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::setserviceport())]
 		pub fn setserviceport(origin: OriginFor<T>, serviceport: Vec<u8>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			let mut flag: bool = false;
@@ -585,26 +622,36 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Add available storage.
+		///
+		/// The dispatch origin of this call must be _root_.
+		///
+		/// Parameters:
+		/// - `increment`: The miners power.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_available_storage())]
 		pub fn add_available_storage(origin: OriginFor<T>, increment: u128) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 			StorageInfoValue::<T>::mutate(|s| (*s).available_storage += increment);
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Add used storage.
+		///
+		/// The dispatch origin of this call must be _root_.
+		///
+		/// Parameters:
+		/// - `increment`: The miners power.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_used_storage())]
 		pub fn add_used_storage(origin: OriginFor<T>, increment: u128) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 			StorageInfoValue::<T>::mutate(|s| (*s).used_storage += increment);
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// A scheduled task for computing power trend data of the entire network.
+		///
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_storage_space())]
 		pub fn timing_storage_space(origin: OriginFor<T>) -> DispatchResult {
-					
+			let _ = ensure_root(origin)?;
 			let now = pallet_timestamp::Pallet::<T>::get();
-
 			let storage_info = StorageInfoValue::<T>::get();
 			let mut storage_info_vec = StorageInfoVec::<T>::get();
 			
@@ -623,10 +670,12 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::TimingStorageSpace());
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// A scheduled task for computing power trend data of the entire network.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_task_storage_space())]
 		pub fn timing_task_storage_space(origin: OriginFor<T>, when: T::BlockNumber, cycle: T::BlockNumber, degree: u32) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			if T::SScheduler::schedule_named(
 				(DEMOCRACY_IDD).encode(),
@@ -639,19 +688,19 @@ pub mod pallet {
 				frame_support::print("LOGIC ERROR: timing_storage_space/schedule_named failed");
 			}
 
-			Self::deposit_event(Event::<T>::AddScheduledTask(sender.clone()));
+			// Self::deposit_event(Event::<T>::AddScheduledTask(sender.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Generate power trend data for the first 30 days.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_storage_space_thirty_days())]
 		pub fn timing_storage_space_thirty_days(origin: OriginFor<T>) -> DispatchResult {
-					
+			let _ = ensure_root(origin)?;
 			let now = pallet_timestamp::Pallet::<T>::get();
-
 			let mut storage_info_vec = StorageInfoVec::<T>::get();
-
 			let mut info1: Vec<StorageInfo> = Vec::new();
-			
+
 			let mut i = 0;
 			while i < 30 {
 				let tmp = TryInto::<u128>::try_into(now).ok().unwrap() - 86400000*(30-i-1);
@@ -671,12 +720,14 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::TimingStorageSpace());
 			Ok(())
 		}
-		
-		#[pallet::weight(50_000_000)]
+		/// Add reward orders.
+		///
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timed_increase_rewards())]
 		pub fn timed_increase_rewards(origin: OriginFor<T>) -> DispatchResult {
+			let _ = ensure_root(origin)?;
 			let total_power = <TotalPower<T>>::get();
 			ensure!(total_power != 0, Error::<T>::DivideByZero);
-			for (peerid, detail) in <MinerDetails<T>>::iter() {
+			for (_, detail) in <MinerDetails<T>>::iter() {
 				Self::add_reward_order1(detail.address,750000000000000000*detail.power/total_power);	
 			}
 			let reward3:BalanceOf<T> = 750000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?;
@@ -689,10 +740,12 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::TimedTask());
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Added timed tasks for reward orders.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_task_increase_power_rewards())]
 		pub fn timing_task_increase_power_rewards(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			if T::SScheduler::schedule_named(
 				(DEMOCRACY_IDA).encode(),
@@ -705,16 +758,17 @@ pub mod pallet {
 				frame_support::print("LOGIC ERROR: timed_increase_rewards/schedule_named failed");
 			}
 
-			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			// Self::deposit_event(Event::<T>::Add(sender.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Delete reward orders.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::del_reward_order())]
 		pub fn del_reward_order(origin: OriginFor<T>,acc: AccountOf<T>, order_num: u128) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			ensure!(CalculateRewardOrderMap::<T>::contains_key(&acc), Error::<T>::NotExisted);
-
 			// ensure!(group_id.user == sender.clone(), Error::<T>::LackOfPermissions);
 
 			// Obtain user computing power order
@@ -727,7 +781,7 @@ pub mod pallet {
 				order_vec,
 			);
 
-			Self::deposit_event(Event::<T>::Del(sender.clone()));
+			// Self::deposit_event(Event::<T>::Del(sender.clone()));
 			Ok(())
 		}
 
@@ -756,8 +810,11 @@ pub mod pallet {
 		// 	Ok(())
 		// }
 
-		#[pallet::weight(50_000_000)]
+		/// Users receive rewards for scheduled tasks.
+		///
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timed_user_receive_award1())]
 		pub fn timed_user_receive_award1(origin: OriginFor<T>) -> DispatchResult {
+			let _ = ensure_root(origin)?;
 			for (peerid, info) in <MinerDetails<T>>::iter() {
 				let sender = info.address;
 				
@@ -770,6 +827,8 @@ pub mod pallet {
 				let reward_claim1 = RewardClaimMap::<T>::get(&sender).unwrap();
 				
 				let award = reward_claim1.current_availability;
+				let total = reward_claim1.total_reward;
+				let total_rewards_currently_available = reward_claim1.total_rewards_currently_available;
 
 				ensure!((reward_claim1.have_to_receive + award) <= reward_claim1.total_rewards_currently_available, Error::<T>::BeyondClaim);
 				
@@ -777,15 +836,26 @@ pub mod pallet {
 
 				RewardClaimMap::<T>::mutate(&sender, |reward_claim_opt| {
 					let reward_claim = reward_claim_opt.as_mut().unwrap();
-					reward_claim.have_to_receive = reward_claim.have_to_receive + award;
+					let have_to_receive = reward_claim.have_to_receive + award;
+					reward_claim.have_to_receive = have_to_receive;
+					reward_claim.current_availability = total_rewards_currently_available - have_to_receive;
+					reward_claim.total_not_receive = total - have_to_receive;
+				});
+
+				MinerDetails::<T>::mutate(peerid, |miner_detail_opt| {
+					let miner_detail = miner_detail_opt.as_mut().unwrap();
+					let total_not_receive = RewardClaimMap::<T>::get(&sender).unwrap().total_not_receive;
+					miner_detail.totald_not_receive = total_not_receive;
 				});
 			}
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Users receive rewards for scheduled tasks.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_user_receive_award())]
 		pub fn timing_user_receive_award(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			if T::SScheduler::schedule_named(
 				(DEMOCRACY_IDC).encode(),
@@ -798,12 +868,14 @@ pub mod pallet {
 				frame_support::print("LOGIC ERROR: timed_user_receive_award1/schedule_named failed");
 			}
 
-			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			// Self::deposit_event(Event::<T>::Add(sender.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
-		pub fn timed_task_award_table(_origin: OriginFor<T>) -> DispatchResult {
+		/// Update the user reward table for scheduled tasks.
+		///
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timed_task_award_table())]
+		pub fn timed_task_award_table(origin: OriginFor<T>) -> DispatchResult {
+			let _ = ensure_root(origin)?;
 			for (_acc, order_vec) in <CalculateRewardOrderMap<T>>::iter() {
 				let mut total:u128 = 0;
 
@@ -811,14 +883,17 @@ pub mod pallet {
 				let mut avail:BalanceOf<T> = 0u128.try_into().map_err(|_e| Error::<T>::ConversionError)?;
 
 				for i in &order_vec{
+					total += i.calculate_reward;
 					if i.deadline > now {
-						total += i.calculate_reward;
 						let tmp = TryInto::<u128>::try_into(now-i.start_t).ok().unwrap();
 						// let day:u128 = tmp/28800+1;
-						// test 5 minutes
-						let day:u128 = tmp/100+1;
+						// // test 5 minutes
+						// let day:u128 = tmp/100+1;
+						// test 6 hours
+						let day:u128 = tmp/7200+1;
 						avail += (i.calculate_reward*8/10/180*day).try_into().map_err(|_e| Error::<T>::ConversionError)?;
 					} else {
+						avail += (i.calculate_reward*8/10).try_into().map_err(|_e| Error::<T>::ConversionError)?;
 						// Call::del_order(_acc,i);
 					}
 				}
@@ -828,11 +903,11 @@ pub mod pallet {
 				let reward2:BalanceOf<T> = total.try_into().map_err(|_e| Error::<T>::ConversionError)?;
 
 				let peerid = MinerItems::<T>::get(&_acc).unwrap().peerid;
-
 				MinerTable::<T>::mutate(peerid, |s_opt| {
 					let s = s_opt.as_mut().unwrap();
 					s.mining_reward = reward2;
-				});	
+				});
+
 				if !<RewardClaimMap<T>>::contains_key(&_acc) {
 					<RewardClaimMap<T>>::insert(
 						&_acc, 
@@ -875,10 +950,12 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::TimedTask());
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Update the user reward table for scheduled tasks.
+		///
+		/// The dispatch origin of this call must be _root_.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::timing_task_award_table())]
 		pub fn timing_task_award_table(origin: OriginFor<T>, when: BlockNumberOf<T>, cycle: BlockNumberOf<T>, degree: u32) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			if T::SScheduler::schedule_named(
 				(DEMOCRACY_IDB).encode(),
@@ -891,23 +968,34 @@ pub mod pallet {
 				frame_support::print("LOGIC ERROR: timed_task_receive_award/schedule_named failed");
 			}
 
-			Self::deposit_event(Event::<T>::Add(sender.clone()));
+			// Self::deposit_event(Event::<T>::Add(sender.clone()));
 			Ok(())
 		}
-		
-		#[pallet::weight(50_000_000)]
+		/// Punish offline miners.
+		///
+		/// The dispatch origin of this call must be _root_.
+		///
+		/// Parameters:
+		/// - `acc`: miner .
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::punishment())]
 		pub fn punishment(origin: OriginFor<T>, acc: AccountOf<T>) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			let _ = ensure_root(origin)?;
 
 			let reward_pot = T::PalletId::get().into_account();
 			
 			<T as pallet::Config>::Currency::transfer(&acc, &reward_pot, <T as pallet::Config>::Currency::total_balance(&acc), AllowDeath)?;
 
-			Self::deposit_event(Event::<T>::FaucetTopUpMoney(sender.clone()));
+			// Self::deposit_event(Event::<T>::FaucetTopUpMoney(sender.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// The faucet top up.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `acc`: Top-up account .
+		/// - `acc`: Top-up amount .
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::faucet_top_up())]
 		pub fn faucet_top_up(origin: OriginFor<T>, acc: AccountOf<T>, award: BalanceOf<T>) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 
@@ -918,11 +1006,15 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::FaucetTopUpMoney(sender.clone()));
 			Ok(())
 		}
-
-		#[pallet::weight(50_000_000)]
+		/// Users receive money through the faucet.
+		///
+		/// The dispatch origin of this call must be _Signed_.
+		///
+		/// Parameters:
+		/// - `acc`: Withdraw money account.
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::faucet())]
 		pub fn faucet(origin: OriginFor<T>, to: AccountOf<T>) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
-			// let _ = ensure_none(origin)?;
+			let _ = ensure_signed(origin)?;
 
 			if !<FaucetRecordMap<T>>::contains_key(&to) {
 				<FaucetRecordMap<T>>::insert(
@@ -932,14 +1024,9 @@ pub mod pallet {
 					}
 				);
 
-				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
-
 				let now = <frame_system::Pallet<T>>::block_number();
-				
 				let reward_pot = T::PalletId::get().into_account();
-
 				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
-
 				<FaucetRecordMap<T>>::insert(
 					&to,
 					FaucetRecord::<T> {
@@ -948,10 +1035,9 @@ pub mod pallet {
 				);
 			} else {
 				let faucet_record = FaucetRecordMap::<T>::get(&to).unwrap();
-
 				let now = <frame_system::Pallet<T>>::block_number();
+
 				let mut flag: bool = true;
-			
 				if now >= BlockNumberOf::<T>::from(28800u32) {
 					if !(faucet_record.last_claim_time <= now - BlockNumberOf::<T>::from(28800u32)) {
 						Self::deposit_event(Event::<T>::LessThan24Hours(faucet_record.last_claim_time, now));
@@ -964,11 +1050,9 @@ pub mod pallet {
 					}
 				}
 				ensure!(flag , Error::<T>::LessThan24Hours);
-		
+				
 				let reward_pot = T::PalletId::get().into_account();
-
 				<T as pallet::Config>::Currency::transfer(&reward_pot, &to, 10000000000000000u128.try_into().map_err(|_e| Error::<T>::ConversionError)?, AllowDeath)?;
-
 				<FaucetRecordMap<T>>::insert(
 					&to,
 					FaucetRecord::<T> {
@@ -979,48 +1063,67 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::DrawFaucetMoney());
 			Ok(())
 		}
-	
+		/// Test method for increasing computational power.
+		///
+		/// The dispatch origin of this call must be _root_.
+		///
+		/// Parameters:
+		/// - `peerid`: The miners' peerid.
+		/// - `increment`: Increased computational power.
 		#[pallet::weight(50_000_000)]
 		pub fn add_power_test(origin: OriginFor<T>, peerid: u64, increment: u128) -> DispatchResult {
+			let _ = ensure_root(origin)?;
 			Self::add_power(peerid,increment);
-
 			Self::deposit_event(Event::<T>::DrawFaucetMoney());
 			Ok(())
 		}
-	
 	}
 }
 
 impl<T: Config> Pallet<T> {
-
+	/// Use aid to get to peerid and segmentid.
+	///
+	/// Parameters:
+	/// - `aid`: aid.
 	pub fn get_ids(aid: &<T as frame_system::Config>::AccountId) -> (u64, u64) {
 		//check exist
 		if !<MinerItems<T>>::contains_key(&aid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 		let peerid = MinerItems::<T>::get(&aid).unwrap().peerid;
 		SegInfo::<T>::mutate(&aid, |s| (*s).segment_index += 1);
 		let segment_new_index = SegInfo::<T>::get(aid).segment_index;
 		(peerid, segment_new_index)
 	}
-
+	/// Use aid to get to peerid.
+	///
+	/// Parameters:
+	/// - `aid`: aid.
 	pub fn get_peerid(aid: &<T as frame_system::Config>::AccountId) -> u64 {
 		if !<MinerItems<T>>::contains_key(&aid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 		let peerid = MinerItems::<T>::get(&aid).unwrap().peerid;
 		peerid
 	}
+	/// Use aid to get to segmentid.
+	///
+	/// Parameters:
+	/// - `aid`: aid.
 	pub fn get_segmentid(aid: &<T as frame_system::Config>::AccountId) -> u64 {
 		SegInfo::<T>::mutate(&aid, |s| (*s).segment_index += 1);
 		let segment_new_index = SegInfo::<T>::get(aid).segment_index;
 		segment_new_index
 	}
-
+	/// Add computing power to corresponding miners.
+	///
+	/// Parameters:
+	/// - `peerid`: peerid.
+	/// - `increment`: computing power.
 	pub fn add_power(peerid: u64, increment: u128) {
 		//check exist
 		if !<WalletMiners<T>>::contains_key(peerid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 
 		TotalPower::<T>::mutate(|s| *s += increment);
@@ -1055,11 +1158,15 @@ impl<T: Config> Pallet<T> {
 		}
 		AllMiner::<T>::put(allminer);
 	}
-
+	/// Sub computing power to corresponding miners.
+	///
+	/// Parameters:
+	/// - `peerid`: peerid.
+	/// - `increment`: computing power.
 	pub fn sub_power(peerid: u64, increment: u128) {
 		//check exist
 		if !<WalletMiners<T>>::contains_key(peerid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 
 		MinerTable::<T>::mutate(peerid, |s_opt| {
@@ -1093,11 +1200,15 @@ impl<T: Config> Pallet<T> {
 		}
 		AllMiner::<T>::put(allminer);
 	}
-
+	/// Add space calculation power to corresponding miners.
+	///
+	/// Parameters:
+	/// - `peerid`: peerid.
+	/// - `increment`: computing power.
 	pub fn add_space(peerid: u64, increment: u128) {
 		//check exist
 		if !<WalletMiners<T>>::contains_key(peerid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 
 		MinerDetails::<T>::mutate(peerid, |s_opt| {
@@ -1131,11 +1242,15 @@ impl<T: Config> Pallet<T> {
 		}
 		AllMiner::<T>::put(allminer);
 	}
-
+	/// Sub space calculation power to corresponding miners.
+	///
+	/// Parameters:
+	/// - `peerid`: peerid.
+	/// - `increment`: computing power.
 	pub fn sub_space(peerid: u64, increment: u128) {
 		//check exist
 		if !<WalletMiners<T>>::contains_key(peerid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 
 		MinerDetails::<T>::mutate(peerid, |s_opt| {
@@ -1169,10 +1284,13 @@ impl<T: Config> Pallet<T> {
 		}
 		AllMiner::<T>::put(allminer);
 	}
-
+	/// According to aid to punish.
+	///
+	/// Parameters:
+	/// - `aid`: aid.
 	pub fn fine_money(aid: &<T as frame_system::Config>::AccountId) -> DispatchResult {
 		if !<MinerItems<T>>::contains_key(&aid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 		let mr = MinerItems::<T>::get(&aid).unwrap();
 		let acc = T::PalletId::get().into_account();
@@ -1180,18 +1298,21 @@ impl<T: Config> Pallet<T> {
 		T::Currency::unreserve(&aid, mr.collaterals);
 		MinerItems::<T>::mutate(&aid, |s| s.as_mut().unwrap().collaterals -= money);
 		T::Currency::transfer(&aid, &acc, money, AllowDeath)?;
-
 		Ok(())
 	}
-
-	// #[pallet::weight(50_000_000)]
-	pub fn add_reward_order1(acc: AccountOf<T>, calculate_reward: u128) -> DispatchResult {
-
+	/// Add reward orders for corresponding accounts.
+	///
+	/// Parameters:
+	/// - `acc`: Rewards account.
+	/// - `calculate_reward`: Calculate the reward.
+	pub fn add_reward_order1(acc: AccountOf<T>, calculate_reward: u128) {
 		let now = <frame_system::Pallet<T>>::block_number();
 		// With block timing, 180 days =5184000 blocks
 		// let deadline = now + T::BlockNumber::from(5184000u32);
-		// test 5 minutes
-		let deadline = now + T::BlockNumber::from(18000u32);
+		// // test 5 minutes
+		// let deadline = now + T::BlockNumber::from(18000u32);
+		// test 6 hours
+		let deadline = now + T::BlockNumber::from(1296000u32);
 
 		if !<CalculateRewardOrderMap<T>>::contains_key(&acc) {
 			let order: Vec<CalculateRewardOrder<T>> = vec![CalculateRewardOrder::<T>{
@@ -1199,7 +1320,6 @@ impl<T: Config> Pallet<T> {
 				start_t: now,
 				deadline: deadline,
 			}];
-
 			<CalculateRewardOrderMap<T>>::insert(
 				acc,
 				order,
@@ -1210,27 +1330,111 @@ impl<T: Config> Pallet<T> {
 				start_t: now,
 				deadline: deadline,
 			};
-
 			// Obtain user computing power order
 			let mut order_vec = CalculateRewardOrderMap::<T>::get(&acc);
-
 			order_vec.push(order1);
-
 			<CalculateRewardOrderMap<T>>::insert(
 				acc,
 				order_vec,
 			);
 		}
-
-		Ok(())
 	}
-
+	/// Get an account based on peerID.
+	///
+	/// Parameters:
+	/// - `peerid`: peerid.
 	pub fn get_acc(peerid: u64) -> AccountOf<T> {
 		if !<MinerDetails<T>>::contains_key(peerid) {
-			Error::<T>::UnregisteredAccountId;
+			frame_support::print("UnregisteredAccountId");
 		}
 		let acc = MinerDetails::<T>::get(peerid).unwrap();
 		acc.address
 	}
+	/// Create a new miner.
+	///
+	/// Parameters:
+	/// - `caller`: Miners account.
+	pub fn new_miner(caller: AccountOf<T>) {
+		let peerid: u64 = 1;
+		let ip: u32 = 15343514;
+		let port: u32 =  32335;
+		let fileport: u32 = 123;
 
+		//init
+		let mst = MinerStatInfo::<T> {
+			total_miners: 0u64,
+			active_miners: 0u64,
+			staking: BalanceOf::<T>::from(0u32),
+			miner_reward: BalanceOf::<T>::from(0u32),
+			sum_files: 0u128,
+		};
+		<MinerStatValue<T>>::put(mst);
+
+		//insert miner
+		<MinerItems<T>>::insert(
+			&caller,
+			Mr::<T> {
+				peerid: peerid,
+				beneficiary: caller.clone(),
+				ip: ip,
+				port: port,
+				fileport: fileport,
+				collaterals: BalanceOf::<T>::from(0u32),
+				earnings: BalanceOf::<T>::from(0u32),
+				locked: BalanceOf::<T>::from(0u32),
+			}
+		);
+		<WalletMiners<T>>::insert(peerid, 1);
+				<PeerIndex<T>>::put(peerid);
+
+		<SegInfo<T>>::insert(
+			&caller,
+			SegmentInfo {
+				segment_index: 0 as u64,
+			}
+		);
+		let add_minerinfo = MinerInfo {
+			peerid: peerid,
+			ip: ip,
+			port: port,
+			fileport: fileport,
+			power: 0 as u128,
+			space: 0 as u128,
+		};
+		AllMiner::<T>::mutate(|s| (*s).push(add_minerinfo));
+		//pallet_sminer::AllMiner::<T>::mutate(|s| (*s).push(add_minerinfo));
+
+		<MinerTable<T>>::insert(
+			peerid,
+			TableInfo::<T> {
+				address: caller.clone(),
+				beneficiary: caller.clone(),
+				total_storage: 0u128,
+				average_daily_data_traffic_in: 0u64,
+				average_daily_data_traffic_out: 0u64,
+				mining_reward: BalanceOf::<T>::from(0u32),
+			}
+		);
+
+		<MinerDetails<T>>::insert(
+			peerid,
+			MinerDetailInfo::<T> {
+				address: caller.clone(),
+				beneficiary: caller.clone(),
+				power: 0u128,
+				space: 0u128,
+				total_reward: BalanceOf::<T>::from(0u32),
+				total_rewards_currently_available: BalanceOf::<T>::from(0u32),
+				totald_not_receive: BalanceOf::<T>::from(0u32),
+				collaterals: BalanceOf::<T>::from(0u32),
+			}
+		);
+
+		MinerStatValue::<T>::mutate(|s_opt| {
+			let s = s_opt.as_mut().unwrap();
+			s.total_miners += 1;
+			s.active_miners += 1;
+			s.staking += BalanceOf::<T>::from(0u32);
+		});
+	}
 }

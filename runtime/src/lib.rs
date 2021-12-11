@@ -783,6 +783,7 @@ parameter_types! {
 	type SScheduler = Scheduler;
 	type SPalletsOrigin = OriginCaller;
 	type SProposal = Call;
+	type WeightInfo = pallet_sminer::weights::SubstrateWeight<Runtime>;
   }
 parameter_types! {
 	pub const SegbkPalletId: PalletId = PalletId(*b"rewardpt");
@@ -794,6 +795,7 @@ impl pallet_segment_book::Config for Runtime {
 	type Event = Event;
 	type MyPalletId = SegbkPalletId;
 	type MyRandomness = RandomnessCollectiveFlip;
+	type WeightInfo = pallet_segment_book::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -1080,10 +1082,13 @@ impl_runtime_apis! {
 			list_benchmark!(list, extra, frame_system, SystemBench::<Runtime>);
 			list_benchmark!(list, extra, pallet_balances, Balances);
 			list_benchmark!(list, extra, pallet_timestamp, Timestamp);
-			list_benchmark!(list, extra, pallet_template, TemplateModule);
+			list_benchmark!(list, extra, pallet_file_bank, FileBank);
+			list_benchmark!(list, extra, pallet_segment_book, SegmentBook);
+			list_benchmark!(list, extra, pallet_sminer, Sminer);
+			// list_benchmark!(list, extra, pallet_template, TemplateModule);
 
 			/*** Add This Line ***/
-			list_benchmark!(list, extra, pallet_scheduler, Scheduler);
+			// list_benchmark!(list, extra, pallet_scheduler, Scheduler);
 					
 			let storage_info = AllPalletsWithSystem::storage_info();
 
@@ -1117,7 +1122,10 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
-			add_benchmark!(params, batches, pallet_template, TemplateModule);
+			add_benchmark!(params, batches, pallet_file_bank, FileBank);
+			add_benchmark!(params, batches, pallet_segment_book, SegmentBook);
+			add_benchmark!(params, batches, pallet_sminer, Sminer);
+			// add_benchmark!(params, batches, pallet_template, TemplateModule);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
