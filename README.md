@@ -83,8 +83,8 @@ Now you can launch node again:
 Install [Docker](https://docs.docker.com/get-docker/) first, and run the following command to start a node on the CESS-Hacknet:
 
 ```
-docker pull cesstech/cess-hacknet:v0.0.1
-docker run --network host cesstech/cess-hacknet:v0.0.1 ./cess-node/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
+docker pull cesstech/cess-hacknet:v0.1.0
+docker run --network host cesstech/cess-hacknet:v0.1.0 ./cess-node/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
 ```
 
 ## Module Documentation
