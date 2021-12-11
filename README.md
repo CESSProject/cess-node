@@ -84,7 +84,7 @@ Install [Docker](https://docs.docker.com/get-docker/) first, and run the followi
 
 ```
 docker pull cesstech/cess-hacknet:v0.1.0
-docker run --network host cesstech/cess-hacknet:v0.1.0 ./cess-node/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
+docker run --network host cesstech/cess-hacknet:v0.1.0 ./home/cess-node/target/release/cess-node --base-path /tmp/cess --chain cess-hacknet
 ```
 
 ## Module Documentation
